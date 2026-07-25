@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard · Dynasty HQ{% endblock %}
+
+{% block content %}
+  <h1 class="text-2xl font-semibold tracking-tight text-white">Dashboard</h1>
+
+  {% if not has_data %}
+    <div class="mt-6 rounded-lg border border-slate-800 bg-slate-900/50 p-6">
+      <h2 class="text-sm font-medium text-slate-200">No data yet</h2>
+      <p class="mt-2 text-sm text-slate-400">
+        Pull the player universe and your league from Sleeper to get started:
+      </p>
+      <pre class="mt-4 overflow-x-auto rounded bg-slate-950 p-4 text-xs text-slate-300"><code>make sync-players
+make sync-league</code></pre>
+      <p class="mt-3 text-xs text-slate-500">
+        <code class="text-slate-400">sync-league</code> needs
+        <code class="text-slate-400">SLEEPER_USERNAME</code> set in your
+        <code class="text-slate-400">.env</code>.
+      </p>
+    </div>
+  {% else %}
+
+    {% if my_teams %}
+      <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        My teams
+      </h2>
+      <div class="mt-3 grid gap-4 sm:grid-cols-2">
+        {% for team in my_teams %}
+          <a href="{% url 'leagues:team_detail' team.pk %}"
+             class="block rounded-lg border border-slate-800 bg-slate-900/50 p-5
+                    transition hover:border-slate-700 hover:bg-slate-900">
+            <div class="text-xs text-slate-500">
+              {{ team.league_season.league.name }} · {{ team.league_season.season }}
+            </div>
+            <div class="mt-1 text-lg font-medium text-white">{{ team }}</div>
+            <dl class="mt-4 flex gap-6 text-sm">
+              <div>
+                <dt class="text-xs text-slate-500">Record</dt>
+                <dd class="font-medium text-slate-200">{{ team.record }}</dd>
+              </div>
+              <div>
+                <dt class="text-xs text-slate-500">Points for</dt>
+                <dd class="font-medium text-slate-200">{{ team.points_for }}</dd>
+              </div>
+              <div>
+                <dt class="text-xs text-slate-500">Players</dt>
+                <dd class="font-medium text-slate-200">{{ team.player_count }}</dd>
+              </div>
+            </dl>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      Leagues
+    </h2>
+    <ul class="mt-3 divide-y divide-slate-800 rounded-lg border border-slate-800">
+      {% for league in leagues %}
+        <li class="flex items-center justify-between px-5 py-4">
+          <div>
+            <a href="{% url 'leagues:league_overview' league.slug %}"
+               class="font-medium text-slate-100 hover:text-white">{{ league.name }}</a>
+            <div class="text-xs text-slate-500">
+              {{ league.seasons.count }} season{{ league.seasons.count|pluralize }}
+            </div>
+          </div>
+          <div class="flex items-center gap-4 text-sm">
+            <a href="{% url 'leagues:league_overview' league.slug %}"
+               class="text-sky-400 hover:text-sky-300">Standings →</a>
+            <a href="{% url 'leagues:free_agents' league.slug %}"
+               class="text-sky-400 hover:text-sky-300">Free agents →</a>
+          </div>
+        </li>
+      {% empty %}
+        <li class="px-5 py-4 text-sm text-slate-500">No leagues synced yet.</li>
+      {% endfor %}
+    </ul>
+
+    <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      Last sync
+    </h2>
+    <dl class="mt-3 grid gap-3 sm:grid-cols-3">
+      {% for label, run in sync_runs %}
+        <div class="rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3">
+          <dt class="text-xs text-slate-500">{{ label }}</dt>
+          <dd class="mt-1 text-sm text-slate-200">
+            {% if run %}
+              {{ run.finished_at|date:"M j, Y H:i" }}
+              <span class="text-slate-500">· {{ run.records_written }} rows</span>
+            {% else %}
+              <span class="text-amber-400">never</span>
+            {% endif %}
+          </dd>
+        </div>
+      {% endfor %}
+    </dl>
+
+  {% endif %}
+{% endblock %}

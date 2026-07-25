@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Free agents · {{ league.name }} · Dynasty HQ{% endblock %}
+
+{% block nav %}
+  <a href="{% url 'leagues:league_overview' league.slug %}"
+     class="hover:text-slate-200">{{ league.name }}</a>
+{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-baseline justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight text-white">Free agents</h1>
+    {% if season %}
+      <p class="text-sm text-slate-500">
+        {{ league.name }} · {{ season.season }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if not season %}
+    <p class="mt-6 rounded-lg border border-slate-800 bg-slate-900/50 px-5 py-6 text-sm text-slate-500">
+      No seasons synced for this league yet. Run <code class="text-slate-400">make sync-league</code>.
+    </p>
+  {% else %}
+
+    <form class="mt-6 space-y-4"
+          hx-get="{% url 'leagues:free_agents_table' league.slug %}"
+          hx-target="#free-agents"
+          hx-swap="innerHTML"
+          hx-trigger="change, keyup from:input[name='q'] changed delay:300ms">
+
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir" value="{{ dir }}">
+
+      <div class="flex flex-wrap items-center gap-3">
+        <input type="search" name="q" value="{{ q }}"
+               placeholder="Search by name…"
+               class="w-56 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5
+                      text-sm text-slate-200 placeholder:text-slate-600
+                      focus:border-sky-500 focus:outline-none">
+
+        <label class="flex items-center gap-2 text-xs text-slate-500">
+          Max age
+          <select name="max_age"
+                  class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5
+                         text-sm text-slate-200 focus:border-sky-500 focus:outline-none">
+            <option value="">any</option>
+            <option value="23" {% if max_age == 23 %}selected{% endif %}>23</option>
+            <option value="25" {% if max_age == 25 %}selected{% endif %}>25</option>
+            <option value="27" {% if max_age == 27 %}selected{% endif %}>27</option>
+            <option value="30" {% if max_age == 30 %}selected{% endif %}>30</option>
+          </select>
+        </label>
+
+        <label class="flex items-center gap-2 text-xs text-slate-500">
+          <input type="checkbox" name="inactive" value="1"
+                 {% if include_inactive %}checked{% endif %}
+                 class="rounded border-slate-700 bg-slate-900 text-sky-500
+                        focus:ring-0 focus:ring-offset-0">
+          Include inactive
+        </label>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs uppercase tracking-wider text-slate-500">Position</span>
+        <label class="cursor-pointer">
+          <input type="radio" name="pos" value="" class="peer sr-only"
+                 {% if not pos %}checked{% endif %}>
+          <span class="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400
+                       peer-checked:border-sky-500 peer-checked:bg-sky-500/15
+                       peer-checked:text-sky-300">All</span>
+        </label>
+        {% for position in positions %}
+          <label class="cursor-pointer">
+            <input type="radio" name="pos" value="{{ position }}" class="peer sr-only"
+                   {% if pos == position %}checked{% endif %}>
+            <span class="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400
+                         peer-checked:border-sky-500 peer-checked:bg-sky-500/15
+                         peer-checked:text-sky-300">{{ position }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </form>
+
+    <div id="free-agents" class="mt-6">
+      {% include "leagues/_free_agent_table.html" %}
+    </div>
+
+    <p class="mt-6 text-xs text-slate-600">
+      “Adds 24h” is how many Sleeper managers league-wide added that player in the
+      last day — refresh it with <code class="text-slate-500">make sync-trending</code>.
+    </p>
+  {% endif %}
+{% endblock %}

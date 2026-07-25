@@ -1,0 +1,52 @@
+[project]
+name = "fantasy-football"
+version = "0.1.0"
+description = "Dynasty fantasy football management, backed by the Sleeper API"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.1",
+    "psycopg[binary]>=3.2",
+    "django-environ>=0.11",
+    "requests>=2.32",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "django-stubs[compatible-mypy]>=5.1",
+    "types-requests>=2.32",
+    "coverage>=7.6",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+# project_management holds planning docs; ruff reformats Python snippets inside
+# their fenced code blocks, which we do not want.
+extend-exclude = ["*/migrations/*", "project_management"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ", "C4", "SIM"]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["mypy_django_plugin.main"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = ["migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = ["*/migrations/*", "*/tests/*", "*/__init__.py", "config/wsgi.py", "config/asgi.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

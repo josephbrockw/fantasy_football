@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}{{ team }} · Dynasty HQ{% endblock %}
+
+{% block nav %}
+  <a href="{% url 'leagues:league_overview' team.league_season.league.slug %}"
+     class="hover:text-slate-200">{{ team.league_season.league.name }}</a>
+{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="text-xs text-slate-500">
+        {{ team.league_season.league.name }} · {{ team.league_season.season }}
+        {% if team.manager.is_me %}
+          <span class="ml-1 rounded bg-sky-500/15 px-1.5 py-0.5 font-medium text-sky-400">
+            my team
+          </span>
+        {% endif %}
+      </div>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white">{{ team }}</h1>
+      {% if team.manager %}
+        <div class="text-sm text-slate-500">{{ team.manager }}</div>
+      {% endif %}
+    </div>
+
+    <dl class="flex gap-6 text-sm">
+      <div>
+        <dt class="text-xs text-slate-500">Record</dt>
+        <dd class="font-medium text-slate-200">{{ team.record }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-slate-500">PF</dt>
+        <dd class="font-medium text-slate-200">{{ team.points_for }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-slate-500">PA</dt>
+        <dd class="font-medium text-slate-200">{{ team.points_against }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-slate-500">FAAB used</dt>
+        <dd class="font-medium text-slate-200">{{ team.waiver_budget_used }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  {# --- Starting lineup: league slot order, never sorted --- #}
+  <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-slate-500">
+    Starting lineup
+    <span class="ml-1 font-normal text-slate-600">({{ lineup|length }} slots)</span>
+  </h2>
+  <div class="mt-2 overflow-x-auto rounded-lg border border-slate-800">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500">
+        <tr>
+          <th class="px-4 py-2 font-medium">Slot</th>
+          <th class="px-4 py-2 font-medium">Player</th>
+          <th class="px-4 py-2 font-medium">Pos</th>
+          <th class="px-4 py-2 font-medium">NFL</th>
+          <th class="px-4 py-2 text-right font-medium">Age</th>
+          <th class="px-4 py-2 text-right font-medium">Exp</th>
+          <th class="px-4 py-2 text-right font-medium">Rookie</th>
+          <th class="px-4 py-2 font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for row in lineup %}
+          <tr class="hover:bg-slate-900/40{% if row.is_empty %} bg-amber-500/5{% endif %}">
+            <td class="px-4 py-2">
+              <span class="rounded px-1.5 py-0.5 text-xs font-semibold
+                           {% if row.is_flex %}bg-violet-500/15 text-violet-300
+                           {% else %}bg-slate-800 text-slate-400{% endif %}">
+                {{ row.position|default:"—" }}
+              </span>
+            </td>
+            {% if row.slot %}
+              {% include "leagues/_player_row.html" with player=row.slot.player %}
+            {% else %}
+              <td class="px-4 py-2 text-sm italic text-amber-400/80" colspan="7">
+                empty
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="px-4 py-6 text-center text-sm text-slate-500">
+            No starting lineup recorded for this season.
+          </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# --- Reserves: sortable and filterable --- #}
+  <div class="mt-10 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+      Reserves
+    </h2>
+    <div class="flex flex-wrap items-center gap-2">
+      <button hx-get="{% url 'leagues:team_reserves' team.pk %}?sort={{ sort }}&dir={{ dir }}"
+              hx-target="#reserves" hx-swap="innerHTML"
+              class="rounded-full border px-3 py-1 text-xs
+                     {% if not pos %}border-sky-500 bg-sky-500/15 text-sky-300
+                     {% else %}border-slate-700 text-slate-400 hover:border-slate-600{% endif %}">
+        All
+      </button>
+      {% for position in positions %}
+        <button hx-get="{% url 'leagues:team_reserves' team.pk %}?sort={{ sort }}&dir={{ dir }}&pos={{ position }}"
+                hx-target="#reserves" hx-swap="innerHTML"
+                class="rounded-full border px-3 py-1 text-xs
+                       {% if pos == position %}border-sky-500 bg-sky-500/15 text-sky-300
+                       {% else %}border-slate-700 text-slate-400 hover:border-slate-600{% endif %}">
+          {{ position }}
+        </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div id="reserves">
+    {% include "leagues/_reserve_tables.html" %}
+  </div>
+{% endblock %}

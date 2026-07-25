@@ -1,0 +1,17 @@
+.git
+.gitignore
+.idea
+.claude
+project_management
+__pycache__
+*.py[cod]
+.venv
+venv
+.env
+htmlcov
+.coverage
+.mypy_cache
+.ruff_cache
+.pytest_cache
+*.sqlite3
+node_modules

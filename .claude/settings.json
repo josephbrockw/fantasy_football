@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test:*)",
+      "Bash(make quality:*)",
+      "Bash(make coverage:*)",
+      "Bash(make fmt:*)",
+      "Bash(make up:*)",
+      "Bash(make down:*)",
+      "Bash(make build:*)",
+      "Bash(make migrate:*)",
+      "Bash(make makemigrations:*)",
+      "Bash(make logs:*)",
+      "Bash(make sync-players:*)",
+      "Bash(make sync-league:*)",
+      "Bash(make sync-trending:*)",
+      "Bash(docker compose ps:*)"
+    ],
+    "deny": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(rtk git add:*)",
+      "Bash(rtk git commit:*)",
+      "Bash(rtk git push:*)",
+      "Bash(rtk git pull:*)"
+    ]
+  }
+}

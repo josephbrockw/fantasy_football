@@ -1,0 +1,44 @@
+{% comment %}
+The swappable reserves fragment (bench / taxi / IR). Returned bare by the HTMX
+endpoint, and included by team_detail.html on first render.
+{% endcomment %}
+{% for value, label, slots in reserve_groups %}
+  <section class="mt-6">
+    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+      {{ label }}
+      <span class="ml-1 font-normal text-slate-600">({{ slots|length }})</span>
+    </h3>
+    <div class="mt-2 overflow-x-auto rounded-lg border border-slate-800">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500">
+          <tr>
+            {% for key, header in sortable_columns %}
+              <th class="px-4 py-2 font-medium{% if key == 'age' or key == 'experience' or key == 'rookie_year' %} text-right{% endif %}">
+                {% if key %}
+                  <button
+                    hx-get="{% url 'leagues:team_reserves' team.pk %}?sort={{ key }}&dir={% if sort == key and dir == 'asc' %}desc{% else %}asc{% endif %}{% if pos %}&pos={{ pos }}{% endif %}"
+                    hx-target="#reserves"
+                    hx-swap="innerHTML"
+                    class="hover:text-slate-300">
+                    {{ header }}{% if sort == key %}<span class="ml-0.5">{% if dir == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+                  </button>
+                {% else %}{{ header }}{% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for slot in slots %}
+            <tr class="hover:bg-slate-900/40">
+              {% include "leagues/_player_row.html" with player=slot.player %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% empty %}
+  <p class="mt-4 rounded-lg border border-slate-800 bg-slate-900/50 px-5 py-6 text-sm text-slate-500">
+    No reserve players{% if pos %} at {{ pos }}{% endif %}.
+  </p>
+{% endfor %}
