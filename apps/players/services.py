@@ -7,14 +7,21 @@ places where Sleeper's payload is not directly usable.
 
 from __future__ import annotations
 
+import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
+from itertools import groupby
 from typing import Any
 
 from django.utils import timezone
 
-from apps.players.models import Player, PlayerWeekStat, TrendingPlayer
+from apps.players.models import (
+    Player,
+    PlayerSeasonMetrics,
+    PlayerWeekStat,
+    TrendingPlayer,
+)
 from apps.sleeper.client import (
     PlayerSource,
     SleeperClient,
@@ -394,4 +401,172 @@ def sync_trending(
         run.records_written = stats.written
         run.records_skipped = stats.skipped
 
+    return stats
+
+
+# --- Season metrics (feature 005) --------------------------------------------
+# Deterministic feature engineering over the ingested stats — no network, no ML.
+
+# Trailing played weeks used for the recent-form average.
+RECENT_WINDOW = 4
+
+# Sleeper usage stat keys promoted to columns.
+TARGETS_KEY = "rec_tgt"
+CARRIES_KEY = "rush_att"
+SNAPS_KEY = "off_snp"
+
+METRICS_UPDATE_FIELDS = [
+    "position",
+    "games_played",
+    "total_ppr",
+    "total_half_ppr",
+    "total_std",
+    "ppg_ppr",
+    "ppg_half_ppr",
+    "ppg_std",
+    "stdev_ppr",
+    "floor_ppr",
+    "ceiling_ppr",
+    "recent_ppg_ppr",
+    "form_delta_ppr",
+    "targets",
+    "carries",
+    "snaps",
+    "usage",
+    "updated_at",
+]
+
+
+def _summed_usage(rows: list[PlayerWeekStat]) -> dict[str, float]:
+    """Sum every numeric non-scoring stat key across the played weeks."""
+    usage: dict[str, float] = {}
+    for row in rows:
+        for key, value in (row.stats or {}).items():
+            if key.startswith("pts_"):  # scoring totals are promoted elsewhere
+                continue
+            number = _as_float(value)
+            if number is None:
+                continue
+            usage[key] = usage.get(key, 0.0) + number
+    return usage
+
+
+def _usage_count(usage: dict[str, float], key: str) -> int | None:
+    return int(usage[key]) if key in usage else None
+
+
+def metrics_from_week_rows(
+    player: Player,
+    season: int,
+    season_type: str,
+    rows: list[PlayerWeekStat],
+) -> PlayerSeasonMetrics:
+    """Aggregate one player-season's weekly stat rows into a metrics row.
+
+    "Played" means a non-null ``pts_ppr`` (Sleeper nulls fantasy points for a
+    week not played; counting those would deflate per-game averages). Every ratio
+    is guarded, so a zero-played-weeks player yields nulls rather than a
+    ``ZeroDivisionError``. Recent form is within-season only — a season-spanning
+    window is a future refinement.
+    """
+    played = [row for row in rows if row.pts_ppr is not None]
+    games = len(played)
+    metrics = PlayerSeasonMetrics(
+        player=player,
+        season=season,
+        season_type=season_type,
+        position=player.position,
+        games_played=games,
+        updated_at=timezone.now(),
+    )
+    if not played:
+        return metrics
+
+    # The `is not None` filter is redundant (played already excludes them) but
+    # narrows the list to float for the numeric aggregations below.
+    ppr = [row.pts_ppr for row in played if row.pts_ppr is not None]
+    metrics.total_ppr = sum(ppr)
+    metrics.total_half_ppr = sum(row.pts_half_ppr or 0.0 for row in played)
+    metrics.total_std = sum(row.pts_std or 0.0 for row in played)
+    metrics.ppg_ppr = metrics.total_ppr / games
+    metrics.ppg_half_ppr = metrics.total_half_ppr / games
+    metrics.ppg_std = metrics.total_std / games
+
+    metrics.stdev_ppr = statistics.pstdev(ppr)
+    metrics.floor_ppr = min(ppr)
+    metrics.ceiling_ppr = max(ppr)
+
+    recent = ppr[-RECENT_WINDOW:]
+    metrics.recent_ppg_ppr = sum(recent) / len(recent)
+    metrics.form_delta_ppr = metrics.recent_ppg_ppr - metrics.ppg_ppr
+
+    usage = _summed_usage(played)
+    metrics.usage = usage
+    metrics.targets = _usage_count(usage, TARGETS_KEY)
+    metrics.carries = _usage_count(usage, CARRIES_KEY)
+    metrics.snaps = _usage_count(usage, SNAPS_KEY)
+    return metrics
+
+
+def upsert_metrics(rows: list[PlayerSeasonMetrics]) -> int:
+    """Insert-or-update metrics on the natural key. Returns count written."""
+    if not rows:
+        return 0
+    PlayerSeasonMetrics.objects.bulk_create(
+        rows,
+        batch_size=BATCH_SIZE,
+        update_conflicts=True,
+        unique_fields=["player", "season", "season_type"],
+        update_fields=METRICS_UPDATE_FIELDS,
+    )
+    return len(rows)
+
+
+def recompute_season(
+    season: int, season_type: str = "regular", *, dry_run: bool = False
+) -> list[PlayerSeasonMetrics]:
+    """Build (and, unless ``dry_run``, upsert) metrics for a whole season."""
+    week_rows = (
+        PlayerWeekStat.objects.filter(
+            season=season, season_type=season_type, kind=PlayerWeekStat.Kind.STAT
+        )
+        .select_related("player")
+        .order_by("player_id", "week")
+    )
+    metrics: list[PlayerSeasonMetrics] = []
+    for _player_id, group in groupby(week_rows, key=lambda r: r.player_id):
+        group_rows = list(group)
+        metrics.append(
+            metrics_from_week_rows(
+                group_rows[0].player, season, season_type, group_rows
+            )
+        )
+    if not dry_run:
+        upsert_metrics(metrics)
+    return metrics
+
+
+def recompute_metrics(
+    *,
+    seasons: Iterable[int] | None = None,
+    season_type: str = "regular",
+    dry_run: bool = False,
+) -> SyncStats:
+    """Rebuild ``PlayerSeasonMetrics`` from ingested stats — DB only, no network.
+
+    Defaults to every season present in ``PlayerWeekStat``. Idempotent: each
+    season upserts on ``(player, season, season_type)``. Wrapped in a ``SyncRun``
+    (``metrics`` kind) for audit parity with the sync commands.
+    """
+    stats = SyncStats()
+    with SyncRun.track(SyncRun.Kind.METRICS) as run:
+        if seasons is None:
+            seasons = list(
+                PlayerWeekStat.objects.values_list("season", flat=True).distinct()
+            )
+        for season in seasons:
+            built = recompute_season(season, season_type, dry_run=dry_run)
+            stats.written += len(built)
+        run.records_written = stats.written
+        run.records_skipped = stats.skipped
     return stats

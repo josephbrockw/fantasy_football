@@ -25,10 +25,14 @@ make sync-league          # pull leagues/rosters (needs SLEEPER_USERNAME in .env
 make sync-trending        # pull trending add/drop counts (free-agent board)
 make sync-transactions    # pull completed trades + traded-pick ownership (needs sync-league first)
 make sync-stats           # backfill weekly player stats & projections (ML substrate)
+make sync-profiles        # enrich players with external draft capital & athleticism
+make recompute-metrics    # rebuild PlayerSeasonMetrics from ingested stats (DB only)
 ```
 
 `python manage.py stats_coverage` prints a per-season/week grid of stored stat
 and projection counts — a read-only way to verify a `sync-stats` backfill.
+`python manage.py metrics_report` prints a per-season `ppg_ppr` leaderboard to
+verify a `recompute-metrics` run.
 
 Postgres is published on host port **5433**, not 5432, to avoid colliding with a
 local Postgres install.
@@ -38,8 +42,13 @@ local Postgres install.
 - `config/` — Django project (env-driven `settings.py` via django-environ)
 - `apps/core/` — the shared `TimeStampedModel` abstract base
 - `apps/sleeper/` — API client, sync services, `SyncRun` audit log
-- `apps/players/` — the `Player` universe, plus `PlayerWeekStat` (weekly stats &
-  projections, backfilled by `sync_stats`) — the substrate for the ML valuation work
+- `apps/players/` — the `Player` universe, `PlayerWeekStat` (weekly stats &
+  projections, backfilled by `sync_stats`), and `PlayerSeasonMetrics` (derived
+  per-season feature store built by `recompute_metrics`) — the substrate for the
+  ML valuation work
+- `apps/enrichment/` — `PlayerProfile`: external, non-Sleeper per-player data
+  (NFL draft capital + combine athleticism) loaded from CSV releases by
+  `sync_profiles`, crosswalked to `Player` by `sleeper_id`
 - `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, and
   the trade layer (`Trade`, `TradeAsset`, `TradedPick`, synced by
   `apps/leagues/transactions.py`), plus all the server-rendered views and

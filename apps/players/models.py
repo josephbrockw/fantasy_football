@@ -149,3 +149,65 @@ class PlayerWeekStat(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.player} {self.season} W{self.week} {self.kind}"
+
+
+class PlayerSeasonMetrics(TimeStampedModel):
+    """Derived, model-ready metrics for one player's season.
+
+    Materialized by ``manage.py recompute_metrics`` from the realised
+    ``PlayerWeekStat`` rows (``kind="stat"``) — **deterministic feature
+    engineering, NOT a prediction**. One row per ``(player, season,
+    season_type)``; the ML valuation in feature 006 joins these against
+    ``Player`` for age/position/experience. The full summed usage dict is kept in
+    ``usage`` so a new Sleeper stat category never costs a migration; the few
+    columns we sort/filter on are promoted (the ``PlayerWeekStat`` pattern).
+    """
+
+    player = models.ForeignKey(
+        Player, on_delete=models.CASCADE, related_name="season_metrics"
+    )
+    season = models.PositiveSmallIntegerField()
+    season_type = models.CharField(max_length=8, default="regular")
+    # Denormalized from Player so per-season leaderboards filter without a join.
+    position = models.CharField(max_length=8, blank=True)
+
+    games_played = models.PositiveSmallIntegerField(default=0)
+
+    # Season totals.
+    total_ppr = models.FloatField(null=True, blank=True)
+    total_half_ppr = models.FloatField(null=True, blank=True)
+    total_std = models.FloatField(null=True, blank=True)
+
+    # Per-game averages (total / games_played).
+    ppg_ppr = models.FloatField(null=True, blank=True)
+    ppg_half_ppr = models.FloatField(null=True, blank=True)
+    ppg_std = models.FloatField(null=True, blank=True)
+
+    # Consistency, all on weekly PPR points.
+    stdev_ppr = models.FloatField(null=True, blank=True)  # population stdev
+    floor_ppr = models.FloatField(null=True, blank=True)  # min weekly PPR
+    ceiling_ppr = models.FloatField(null=True, blank=True)  # max weekly PPR
+
+    # Recent form: average of the last RECENT_WINDOW played weeks, and the delta
+    # vs the season average (positive = trending up).
+    recent_ppg_ppr = models.FloatField(null=True, blank=True)
+    form_delta_ppr = models.FloatField(null=True, blank=True)
+
+    # Usage proxies, summed across the season. Promoted for sorting; the full
+    # summed stat-category dict is in `usage`.
+    targets = models.PositiveIntegerField(null=True, blank=True)  # rec_tgt
+    carries = models.PositiveIntegerField(null=True, blank=True)  # rush_att
+    snaps = models.PositiveIntegerField(null=True, blank=True)  # off_snp
+    usage = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        unique_together = ("player", "season", "season_type")
+        ordering = ["-season", "-ppg_ppr"]
+        indexes = [
+            models.Index(fields=["season", "position"]),
+            models.Index(fields=["player", "season"]),
+            models.Index(fields=["season", "-ppg_ppr"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player} {self.season} metrics"

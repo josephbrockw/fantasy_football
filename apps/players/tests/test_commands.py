@@ -7,7 +7,12 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 
-from apps.players.models import Player, PlayerWeekStat, TrendingPlayer
+from apps.players.models import (
+    Player,
+    PlayerSeasonMetrics,
+    PlayerWeekStat,
+    TrendingPlayer,
+)
 from apps.players.tests.utils import BRADY, CHASE, FakeSleeperClient
 from apps.sleeper.client import SleeperAPIError
 from apps.sleeper.models import SyncRun
@@ -222,3 +227,90 @@ class StatsCoverageCommandTests(TestCase):
     def test_empty_warns_cleanly(self) -> None:
         output = self.call()
         self.assertIn("No PlayerWeekStat rows found", output)
+
+
+class RecomputeMetricsCommandTests(TestCase):
+    def seed(self, season: int = 2024) -> None:
+        player = Player.objects.create(sleeper_id="p", full_name="X", position="WR")
+        PlayerWeekStat.objects.create(
+            player=player, season=season, week=1, kind="stat", pts_ppr=10.0
+        )
+
+    def test_writes_and_reports(self) -> None:
+        self.seed()
+        out = StringIO()
+        call_command("recompute_metrics", "--season", "2024", stdout=out)
+        self.assertIn("season-metric row(s)", out.getvalue())
+        self.assertTrue(PlayerSeasonMetrics.objects.exists())
+
+    def test_default_recomputes_all(self) -> None:
+        self.seed()
+        call_command("recompute_metrics", stdout=StringIO())
+        self.assertTrue(PlayerSeasonMetrics.objects.exists())
+
+
+class MetricsReportCommandTests(TestCase):
+    def make_metrics(
+        self,
+        name: str,
+        season: int,
+        ppg: float,
+        position: str = "WR",
+    ) -> None:
+        player = Player.objects.create(
+            sleeper_id=name, full_name=name, position=position
+        )
+        PlayerSeasonMetrics.objects.create(
+            player=player,
+            season=season,
+            position=position,
+            games_played=10,
+            ppg_ppr=ppg,
+            form_delta_ppr=1.0,
+        )
+
+    def call(self, *args: str) -> str:
+        out = StringIO()
+        call_command("metrics_report", *args, stdout=out)
+        return out.getvalue()
+
+    def test_lists_top_players_in_order(self) -> None:
+        self.make_metrics("Alpha", 2024, 25.0)
+        self.make_metrics("Bravo", 2024, 15.0)
+        self.make_metrics("Charlie", 2023, 20.0)
+        output = self.call()
+        self.assertIn("2024", output)
+        self.assertIn("2023", output)
+        self.assertLess(output.index("Alpha"), output.index("Bravo"))  # 25 > 15
+
+    def test_each_season_printed_once(self) -> None:
+        # Two players with distinct ppg_ppr in one season must not duplicate the
+        # season block (the Meta.ordering + distinct() trap).
+        self.make_metrics("Alpha", 2024, 25.0)
+        self.make_metrics("Bravo", 2024, 15.0)
+        output = self.call()
+        self.assertEqual(output.count("2024 (regular)"), 1)
+
+    def test_top_limit(self) -> None:
+        self.make_metrics("Alpha", 2024, 25.0)
+        self.make_metrics("Bravo", 2024, 15.0)
+        output = self.call("--top", "1")
+        self.assertIn("Alpha", output)
+        self.assertNotIn("Bravo", output)
+
+    def test_position_filter(self) -> None:
+        self.make_metrics("Wr1", 2024, 25.0, position="WR")
+        self.make_metrics("Rb1", 2024, 20.0, position="RB")
+        output = self.call("--position", "WR")
+        self.assertIn("Wr1", output)
+        self.assertNotIn("Rb1", output)
+
+    def test_season_filter(self) -> None:
+        self.make_metrics("Alpha", 2024, 25.0)
+        self.make_metrics("Bravo", 2023, 20.0)
+        output = self.call("--season", "2024")
+        self.assertIn("2024", output)
+        self.assertNotIn("Bravo", output)
+
+    def test_empty_warns_cleanly(self) -> None:
+        self.assertIn("No PlayerSeasonMetrics rows found", self.call())

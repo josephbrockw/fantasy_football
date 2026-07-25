@@ -33,7 +33,7 @@ so it is cheap to re-run whenever new weeks are ingested.
 
 <!-- Concrete, verifiable outcomes. Each one must be independently checkable. -->
 
-- [ ] A `PlayerSeasonMetrics` model stores one row per
+- [x] A `PlayerSeasonMetrics` model stores one row per
       `(player, season, season_type)` carrying: `games_played`; season totals
       (`total_ppr` / `total_half_ppr` / `total_std`); per-game averages
       (`ppg_ppr` / `ppg_half_ppr` / `ppg_std`); consistency on weekly PPR
@@ -42,30 +42,30 @@ so it is cheap to re-run whenever new weeks are ingested.
       usage proxies (`targets`, `carries`, `snaps`) plus a `usage` JSONField of
       the full summed stat-category dict; and a denormalized `position`. It has a
       `unique_together` on the key, migrations, and admin registration.
-- [ ] The metrics are derived **only from realised stats** (`PlayerWeekStat`
+- [x] The metrics are derived **only from realised stats** (`PlayerWeekStat`
       rows with `kind="stat"`), never from projections, and the recompute makes
       **no Sleeper network calls** — it reads the local DB and nothing else.
-- [ ] A `recompute_metrics` service and management command (`make
+- [x] A `recompute_metrics` service and management command (`make
       recompute-metrics`) rebuild the table from `PlayerWeekStat`. With no
       arguments it recomputes every season present; a season range can be
       narrowed via flags. It is **idempotent**: re-running upserts rows in place
       via `bulk_create(update_conflicts=True)` with no duplicates, refreshing
       `updated_at` explicitly (the `TimeStampedModel` `auto_now` is bypassed by
       bulk writes).
-- [ ] Each metric is computed correctly and deterministically:
+- [x] Each metric is computed correctly and deterministically:
       `games_played` counts only weeks the player actually played; per-game
       values divide totals by `games_played`; `stdev_ppr` is the population
       standard deviation of weekly PPR; `floor_ppr` / `ceiling_ppr` are the min /
       max weekly PPR; recent-form uses the last `RECENT_WINDOW` played weeks; and
       `targets` / `carries` / `snaps` are summed from the correct Sleeper stat
       keys (`rec_tgt` / `rush_att` / `off_snp`), tolerating absent keys.
-- [ ] Every recompute run is wrapped in a `SyncRun` (new `metrics` kind) that
+- [x] Every recompute run is wrapped in a `SyncRun` (new `metrics` kind) that
       records rows written and skipped and captures failure without leaving a
       half-recorded run.
-- [ ] A read-only report command (`python manage.py metrics_report`) prints, per
+- [x] A read-only report command (`python manage.py metrics_report`) prints, per
       season, how many metrics rows exist and the top players by `ppg_ppr`, so a
       recompute can be verified at a glance. No player-facing web view is added.
-- [ ] `make test`, `make coverage`, and `make quality` all pass; new code is
+- [x] `make test`, `make coverage`, and `make quality` all pass; new code is
       covered.
 
 ## Pull requests
@@ -76,21 +76,21 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 
 | # | PR | Status | Notes |
 |----|----|--------|-------|
-| 01 | [PlayerSeasonMetrics model & migration](01_playerseasonmetrics-model.md) | Planned | |
-| 02 | [Recompute service, command & make target](02_recompute-service-and-command.md) | Planned | |
-| 03 | [Read-only metrics report](03_metrics-report.md) | Planned | |
+| 01 | [PlayerSeasonMetrics model & migration](01_playerseasonmetrics-model.md) | Complete | Reviewed and accepted |
+| 02 | [Recompute service, command & make target](02_recompute-service-and-command.md) | Complete | Reviewed and accepted |
+| 03 | [Read-only metrics report](03_metrics-report.md) | Complete | Reviewed and accepted |
 
 ## Definition of Done
 
 The feature is complete only when every box is checked. Then finalize the docs
 and move this directory to `features/archived/`.
 
-- [ ] All acceptance criteria verified
-- [ ] All new/changed code has test coverage
-- [ ] All tests pass (`make test` / `test-runner`)
-- [ ] Coverage confirmed (`make coverage` / `coverage-runner`)
-- [ ] Code quality confirmed (`make quality` / `quality-runner`)
-- [ ] No outstanding build errors
-- [ ] Documentation updated
+- [x] All acceptance criteria verified
+- [x] All new/changed code has test coverage
+- [x] All tests pass (`make test` / `test-runner`)
+- [x] Coverage confirmed (`make coverage` / `coverage-runner`)
+- [x] Code quality confirmed (`make quality` / `quality-runner`)
+- [x] No outstanding build errors
+- [x] Documentation updated
 </content>
 </invoke>

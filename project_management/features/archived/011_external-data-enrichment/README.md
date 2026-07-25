@@ -55,7 +55,7 @@ no existing view.
 
 <!-- Concrete, verifiable outcomes. Each one must be independently checkable. -->
 
-- [ ] A per-player `PlayerProfile` model (OneToOne to `players.Player`,
+- [x] A per-player `PlayerProfile` model (OneToOne to `players.Player`,
       `related_name="profile"`) stores **NFL draft capital** (`draft_year`,
       `draft_round`, `draft_pick`, `draft_team`), the external **crosswalk ids**
       needed for downstream joins (at least `pfr_id`, plus `gsis_id`), and
@@ -63,31 +63,31 @@ no existing view.
       fields: forty, bench, vertical, broad jump, cone, shuttle). It has
       `unique` on `player`, supporting indexes, a migration, and an admin
       registration.
-- [ ] A **new `apps/enrichment` app** houses a **file loader/client** that
+- [x] A **new `apps/enrichment` app** houses a **file loader/client** that
       downloads a versioned, auth-free CSV release (DynastyProcess
       `db_playerids`) over HTTP behind a capability `Protocol` — **not** routed
       through `SleeperClient`, and **not** web scraping. The loader is exercised
       in tests by a **fake loader + a tiny CSV fixture**; **no test touches the
       network**.
-- [ ] A `sync_profiles` service crosswalks each incoming row to a `Player` by
+- [x] A `sync_profiles` service crosswalks each incoming row to a `Player` by
       `sleeper_id`, **bulk-upserts** `PlayerProfile` idempotently on its natural
       key (`bulk_create(update_conflicts=True)` with `updated_at` set
       explicitly), and **skips + counts** rows that don't map to a known
       `Player`. The whole run is wrapped in a `SyncRun` (new `profiles` kind)
       recording rows written and skipped, and captures failure without leaving a
       half-recorded run.
-- [ ] `make sync-profiles` (management command `sync_profiles`) populates draft
+- [x] `make sync-profiles` (management command `sync_profiles`) populates draft
       capital and crosswalk ids for known players; re-running is idempotent (no
       duplicates, values refreshed in place). Flags: `--dry-run`, and a
       `--url`/source override for pinning a release.
-- [ ] **Athleticism** measurables (nflverse combine) are joined onto the same
+- [x] **Athleticism** measurables (nflverse combine) are joined onto the same
       `PlayerProfile` rows via the `pfr_id` captured from `db_playerids`,
       populating the combine columns for players the combine covers and leaving
       them null otherwise.
-- [ ] Surfacing is intentionally minimal: **admin is sufficient**; downstream
+- [x] Surfacing is intentionally minimal: **admin is sufficient**; downstream
       005/006/007 consume the fields. (Optionally a small draft round/pick badge
       is deferred — see PR 03 scope.)
-- [ ] `make test`, `make coverage`, and `make quality` all pass; new code is
+- [x] `make test`, `make coverage`, and `make quality` all pass; new code is
       covered.
 
 ## Pull requests
@@ -100,7 +100,7 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 |----|----|--------|-------|
 | 01 | [PlayerProfile model, enrichment app & migration](01_playerprofile-model.md) | Complete | Reviewed and accepted |
 | 02 | [Draft-capital loader, sync & command](02_draft-capital-loader-and-sync.md) | Complete | The `sleeper_id` crosswalk lives here. Reviewed and accepted |
-| 03 | [Combine athleticism enrichment](03_combine-athleticism.md) | In Progress | Joins via `pfr_id` from PR 02 |
+| 03 | [Combine athleticism enrichment](03_combine-athleticism.md) | Complete | Joins via `pfr_id` from PR 02. Reviewed and accepted |
 
 ## Out of scope (stated explicitly)
 
@@ -120,12 +120,12 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 The feature is complete only when every box is checked. Then finalize the docs
 and move this directory to `features/archived/`.
 
-- [ ] All acceptance criteria verified
-- [ ] All new/changed code has test coverage
-- [ ] All tests pass (`make test` / `test-runner`)
-- [ ] Coverage confirmed (`make coverage` / `coverage-runner`)
-- [ ] Code quality confirmed (`make quality` / `quality-runner`)
-- [ ] No outstanding build errors
-- [ ] Documentation updated
+- [x] All acceptance criteria verified
+- [x] All new/changed code has test coverage
+- [x] All tests pass (`make test` / `test-runner`)
+- [x] Coverage confirmed (`make coverage` / `coverage-runner`)
+- [x] Code quality confirmed (`make quality` / `quality-runner`)
+- [x] No outstanding build errors
+- [x] Documentation updated
 </content>
 </invoke>
