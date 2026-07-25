@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.players.models import Player, TrendingPlayer
+from apps.players.models import Player, PlayerWeekStat, TrendingPlayer
 
 
 @admin.register(Player)
@@ -28,3 +28,12 @@ class TrendingPlayerAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
     search_fields = ("player__full_name",)
     ordering = ("-count",)
+
+
+@admin.register(PlayerWeekStat)
+class PlayerWeekStatAdmin(admin.ModelAdmin):
+    list_display = ("player", "season", "week", "kind", "pts_ppr")
+    list_filter = ("kind", "season", "week", "season_type")
+    search_fields = ("player__full_name",)
+    # The player table is huge — don't render it as a dropdown.
+    raw_id_fields = ("player",)

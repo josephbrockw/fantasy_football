@@ -7,7 +7,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 
-from apps.players.models import Player, TrendingPlayer
+from apps.players.models import Player, PlayerWeekStat, TrendingPlayer
 from apps.players.tests.utils import BRADY, CHASE, FakeSleeperClient
 from apps.sleeper.client import SleeperAPIError
 from apps.sleeper.models import SyncRun
@@ -144,3 +144,81 @@ class SyncTrendingCommandTests(TestCase):
             self.call(client=client)
 
         self.assertIn("trending down", str(ctx.exception))
+
+
+class SyncStatsCommandTests(TestCase):
+    def setUp(self) -> None:
+        with mock.patch(COMMAND_PATH, return_value=FakeSleeperClient()):
+            call_command("sync_players", stdout=StringIO())
+
+    def call(self, *args: str, client: FakeSleeperClient | None = None) -> str:
+        out = StringIO()
+        with mock.patch(COMMAND_PATH, return_value=client or FakeSleeperClient()):
+            call_command("sync_stats", *args, stdout=out)
+        return out.getvalue()
+
+    def test_writes_and_reports(self) -> None:
+        output = self.call("--season", "2024", "--week", "1")
+        self.assertIn("stat row(s)", output)
+        self.assertTrue(PlayerWeekStat.objects.exists())
+
+    def test_kind_flag_restricts_to_projection(self) -> None:
+        self.call("--season", "2024", "--week", "1", "--kind", "projection")
+        self.assertTrue(PlayerWeekStat.objects.filter(kind="projection").exists())
+        self.assertFalse(PlayerWeekStat.objects.filter(kind="stat").exists())
+
+    def test_season_flag_bounds_both_ends(self) -> None:
+        self.call("--season", "2024", "--week", "1")
+        self.assertTrue(PlayerWeekStat.objects.filter(season=2024).exists())
+        self.assertFalse(PlayerWeekStat.objects.exclude(season=2024).exists())
+
+    def test_api_error_becomes_command_error(self) -> None:
+        client = FakeSleeperClient(error=SleeperAPIError("stats down"))
+        with self.assertRaises(CommandError) as ctx:
+            self.call("--season", "2024", "--week", "1", client=client)
+        self.assertIn("stats down", str(ctx.exception))
+
+
+class StatsCoverageCommandTests(TestCase):
+    player: Player
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.player = Player.objects.create(sleeper_id="p1", full_name="A Player")
+
+    def make_stat(self, season: int, week: int, kind: str) -> None:
+        PlayerWeekStat.objects.create(
+            player=self.player, season=season, week=week, kind=kind
+        )
+
+    def call(self, *args: str) -> str:
+        out = StringIO()
+        call_command("stats_coverage", *args, stdout=out)
+        return out.getvalue()
+
+    def test_reports_counts_per_season_and_week(self) -> None:
+        self.make_stat(2024, 1, "stat")
+        self.make_stat(2024, 1, "projection")
+        self.make_stat(2025, 5, "stat")
+
+        output = self.call()
+
+        self.assertIn("2024", output)
+        self.assertIn("W01", output)
+        self.assertIn("stat=1", output)
+        self.assertIn("proj=1", output)
+        self.assertIn("2025", output)
+        self.assertIn("W05", output)
+
+    def test_season_filter_excludes_others(self) -> None:
+        self.make_stat(2024, 1, "stat")
+        self.make_stat(2025, 1, "stat")
+
+        output = self.call("--season", "2024")
+
+        self.assertIn("2024", output)
+        self.assertNotIn("2025", output)
+
+    def test_empty_warns_cleanly(self) -> None:
+        output = self.call()
+        self.assertIn("No PlayerWeekStat rows found", output)

@@ -7,12 +7,20 @@ places where Sleeper's payload is not directly usable.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from apps.players.models import Player, TrendingPlayer
-from apps.sleeper.client import PlayerSource, SleeperClient, TrendingSource
+from django.utils import timezone
+
+from apps.players.models import Player, PlayerWeekStat, TrendingPlayer
+from apps.sleeper.client import (
+    PlayerSource,
+    SleeperClient,
+    StatsSource,
+    TrendingSource,
+)
 from apps.sleeper.models import SyncRun
 
 FANTASY_POSITIONS = frozenset({"QB", "RB", "WR", "TE", "K", "DEF"})
@@ -82,6 +90,15 @@ def _as_int(value: Any) -> int | None:
 
 def _as_str(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _as_date(value: Any) -> date | None:
@@ -191,6 +208,138 @@ def sync_players(
 
         stats.written = len(keep) if dry_run else upsert_players(keep)
 
+        run.records_written = stats.written
+        run.records_skipped = stats.skipped
+
+    return stats
+
+
+# Earliest season worth backfilling. Sleeper has older data, but the tracked
+# player universe and ML relevance start here; override with --start-season.
+MIN_SEASON = 2018
+
+STAT_UPDATE_FIELDS = ["pts_ppr", "pts_half_ppr", "pts_std", "stats", "updated_at"]
+
+
+def stat_row_from_payload(
+    player: Player,
+    season: int,
+    week: int,
+    season_type: str,
+    kind: str,
+    stat_dict: dict[str, Any],
+) -> PlayerWeekStat:
+    """Build one unsaved ``PlayerWeekStat`` row.
+
+    ``updated_at`` is set explicitly because ``bulk_create(update_conflicts=True)``
+    bypasses ``TimeStampedModel``'s ``auto_now`` — the same caveat ``sync_players``
+    works around.
+    """
+    return PlayerWeekStat(
+        player=player,
+        season=season,
+        week=week,
+        season_type=season_type,
+        kind=kind,
+        pts_ppr=_as_float(stat_dict.get("pts_ppr")),
+        pts_half_ppr=_as_float(stat_dict.get("pts_half_ppr")),
+        pts_std=_as_float(stat_dict.get("pts_std")),
+        stats=stat_dict,
+        updated_at=timezone.now(),
+    )
+
+
+def upsert_week_stats(rows: list[PlayerWeekStat]) -> int:
+    """Insert-or-update stat rows on their natural key. Returns count written."""
+    if not rows:
+        return 0
+    PlayerWeekStat.objects.bulk_create(
+        rows,
+        batch_size=BATCH_SIZE,
+        update_conflicts=True,
+        unique_fields=["player", "season", "week", "season_type", "kind"],
+        update_fields=STAT_UPDATE_FIELDS,
+    )
+    return len(rows)
+
+
+def ingest_week(
+    client: StatsSource,
+    season: int,
+    week: int,
+    kind: str,
+    season_type: str = "regular",
+    *,
+    dry_run: bool = False,
+) -> tuple[int, int]:
+    """Fetch one (season, week, kind) and store rows for known players only.
+
+    The payload is keyed by the whole Sleeper universe (~550 KB); like
+    ``sync_trending`` we resolve the ids we track in one query and count the rest
+    as skipped, keeping stored volume bounded. Returns ``(written, skipped)``.
+    """
+    fetch = (
+        client.get_player_stats
+        if kind == PlayerWeekStat.Kind.STAT
+        else client.get_player_projections
+    )
+    payload = fetch(str(season), week, season_type) or {}
+    if not payload:  # an empty week is normal, not an error
+        return 0, 0
+
+    ids = [str(pid) for pid in payload]
+    known = {
+        player.sleeper_id: player
+        for player in Player.objects.filter(sleeper_id__in=ids)
+    }
+    rows: list[PlayerWeekStat] = []
+    skipped = 0
+    for player_id, stat_dict in payload.items():
+        player = known.get(str(player_id))
+        if player is None:
+            skipped += 1
+            continue
+        rows.append(
+            stat_row_from_payload(
+                player, season, week, season_type, kind, stat_dict or {}
+            )
+        )
+
+    written = len(rows) if dry_run else upsert_week_stats(rows)
+    return written, skipped
+
+
+def sync_stats(
+    client: StatsSource | None = None,
+    *,
+    start_season: int | None = None,
+    end_season: int | None = None,
+    weeks: Iterable[int] | None = None,
+    kinds: Sequence[str] = (PlayerWeekStat.Kind.STAT, PlayerWeekStat.Kind.PROJECTION),
+    season_type: str = "regular",
+    dry_run: bool = False,
+) -> SyncStats:
+    """Backfill weekly stats and projections across a season/week range.
+
+    With no bounds it pulls ``MIN_SEASON`` through the current season (from
+    ``get_nfl_state``), weeks 1–18, for both kinds. Idempotent — each week upserts
+    on the natural key, so re-running a range refreshes in place.
+    """
+    client = client or SleeperClient()
+    stats = SyncStats()
+    start = start_season or MIN_SEASON
+    week_list = list(weeks) if weeks is not None else list(range(1, 19))
+
+    with SyncRun.track(SyncRun.Kind.STATS) as run:
+        end = end_season or int(client.get_nfl_state().get("season") or MIN_SEASON)
+        for season in range(start, end + 1):
+            for week in week_list:
+                for kind in kinds:
+                    written, skipped = ingest_week(
+                        client, season, week, kind, season_type, dry_run=dry_run
+                    )
+                    stats.written += written
+                    stats.skipped += skipped
         run.records_written = stats.written
         run.records_skipped = stats.skipped
 

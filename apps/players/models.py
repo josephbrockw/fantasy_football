@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from django.db import models
 
+from apps.core.models import TimeStampedModel
+
 
 class Player(models.Model):
     """An NFL player as Sleeper knows them.
@@ -98,3 +100,52 @@ class TrendingPlayer(models.Model):
 
     def __str__(self) -> str:
         return f"{self.player} {self.kind} {self.count}"
+
+
+class PlayerWeekStat(TimeStampedModel):
+    """One player's stat or projection line for a single NFL week.
+
+    Fed by ``manage.py sync_stats`` from Sleeper's parallel ``/stats`` and
+    ``/projections`` endpoints. **One table, discriminated by ``kind``**, because
+    the two payloads are identically shaped and the ML feature will join a
+    projection against the realised stat for the same ``(player, season, week)``
+    — one set of indexes, one upsert path, and that join for free. The full
+    Sleeper stat-category dict is kept in ``stats`` so a new category never costs
+    a migration; the three fantasy scoring totals are promoted to nullable
+    columns for sorting and aggregation.
+    """
+
+    class Kind(models.TextChoices):
+        STAT = "stat", "Stat"
+        PROJECTION = "projection", "Projection"
+
+    player = models.ForeignKey(
+        Player, on_delete=models.CASCADE, related_name="week_stats"
+    )
+    season = models.PositiveSmallIntegerField()
+    week = models.PositiveSmallIntegerField()
+    # Sleeper path segment: regular | post | pre. Default matches the backfill.
+    season_type = models.CharField(max_length=8, default="regular")
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+
+    pts_ppr = models.FloatField(null=True, blank=True)
+    pts_half_ppr = models.FloatField(null=True, blank=True)
+    pts_std = models.FloatField(null=True, blank=True)
+
+    # Whole stat-category dict, so a Sleeper schema addition never migrates.
+    stats = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        # The idempotency key PR 02's bulk upsert writes against. season_type is
+        # in the key so a postseason pull can't collide with the regular-season
+        # row for the same week.
+        unique_together = ("player", "season", "week", "season_type", "kind")
+        ordering = ["-season", "-week", "kind"]
+        indexes = [
+            models.Index(fields=["season", "week", "kind"]),
+            models.Index(fields=["player", "kind"]),
+            models.Index(fields=["kind", "season", "week"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player} {self.season} W{self.week} {self.kind}"

@@ -21,7 +21,7 @@ endpoint returns all of those, and we parse only `type == "trade"`.
 
 <!-- Concrete, verifiable outcomes. Each one must be independently checkable. -->
 
-- [ ] `apps/leagues/models.py` gains `Trade` (a completed trade within a
+- [x] `apps/leagues/models.py` gains `Trade` (a completed trade within a
       `LeagueSeason`: `sleeper_transaction_id` unique, `week`, `status`,
       `status_updated`), `TradeAsset` (one asset moving in a trade — a `Player`
       FK, or a draft pick `season`/`round`, or a FAAB amount — with sending and
@@ -29,30 +29,30 @@ endpoint returns all of those, and we parse only `type == "trade"`.
       `LeagueSeason`, pick `season`, `round`, `original_owner` and
       `current_owner` as `Manager` FKs). All have a migration and are registered
       in the admin.
-- [ ] `SleeperClient` gains `get_league_transactions(league_id, week)` and
+- [x] `SleeperClient` gains `get_league_transactions(league_id, week)` and
       `get_traded_picks(league_id)`, both following the `get_league_rosters`
       convention (404 / null → `[]`), with client-level test coverage.
-- [ ] `make sync-transactions` walks weeks `1..N` of each already-synced
+- [x] `make sync-transactions` walks weeks `1..N` of each already-synced
       `LeagueSeason`, ingests only `type == "trade"` transactions (waiver /
       free_agent / commissioner transactions are ignored), and records a
       `SyncRun` (`kind == "transactions"`) that reports success/failure and a
       record count.
-- [ ] Each stored trade records its assets — traded **players**, traded **draft
+- [x] Each stored trade records its assets — traded **players**, traded **draft
       picks** (season + round), and **FAAB** — each with the sending and
       receiving `Team`, resolved by mapping the transaction's `roster_id`s to
       `Team`s within that `LeagueSeason`.
-- [ ] `traded_picks` ownership is stored as current-state (rebuilt wholesale
+- [x] `traded_picks` ownership is stored as current-state (rebuilt wholesale
       each run, like the roster rebuild), with `original_owner` and
       `current_owner` resolved to a `Manager` (the cross-season-stable
       `sleeper_user_id`) so a pick for a future season whose `LeagueSeason` does
       not exist yet is still attributed correctly.
-- [ ] Re-running `make sync-transactions` is idempotent: trades upsert on
+- [x] Re-running `make sync-transactions` is idempotent: trades upsert on
       `sleeper_transaction_id`, pick ownership is rebuilt, no duplicates.
-- [ ] A read view at `/league/<slug>/trades/` surfaces trade history
+- [x] A read view at `/league/<slug>/trades/` surfaces trade history
       (newest-first, per season, each side showing what each manager received)
       and the current pick-ownership table, linked from the shared league
       sub-nav.
-- [ ] `make test`, `make coverage`, and `make quality` all pass; new code is
+- [x] `make test`, `make coverage`, and `make quality` all pass; new code is
       covered, with Sleeper HTTP faked from fixtures (no test touches the
       network).
 
@@ -66,19 +66,19 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 |----|----|--------|-------|
 | 01 | [Trade, TradeAsset & TradedPick models](01_trade-models.md) | Complete | Reviewed and accepted |
 | 02 | [Transactions & traded-picks sync](02_transactions-sync.md) | Complete | Reviewed and accepted |
-| 03 | [Trades & pick-ownership view](03_trades-view.md) | In Progress | |
+| 03 | [Trades & pick-ownership view](03_trades-view.md) | Complete | Reviewed and accepted |
 
 ## Definition of Done
 
 The feature is complete only when every box is checked. Then finalize the docs
 and move this directory to `features/archived/`.
 
-- [ ] All acceptance criteria verified
-- [ ] All new/changed code has test coverage
-- [ ] All tests pass (`make test` / `test-runner`)
-- [ ] Coverage confirmed (`make coverage` / `coverage-runner`)
-- [ ] Code quality confirmed (`make quality` / `quality-runner`)
-- [ ] No outstanding build errors
-- [ ] Documentation updated
+- [x] All acceptance criteria verified
+- [x] All new/changed code has test coverage
+- [x] All tests pass (`make test` / `test-runner`)
+- [x] Coverage confirmed (`make coverage` / `coverage-runner`)
+- [x] Code quality confirmed (`make quality` / `quality-runner`)
+- [x] No outstanding build errors
+- [x] Documentation updated
 </content>
 </invoke>

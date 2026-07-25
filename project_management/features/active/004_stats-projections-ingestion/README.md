@@ -63,9 +63,9 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 
 | # | PR | Status | Notes |
 |----|----|--------|-------|
-| 01 | [PlayerWeekStat model & migration](01_playerweekstat-model.md) | Planned | |
-| 02 | [Stats client, backfill sync & command](02_stats-sync-and-command.md) | Planned | |
-| 03 | [Backfill coverage report](03_coverage-report.md) | Planned | |
+| 01 | [PlayerWeekStat model & migration](01_playerweekstat-model.md) | Complete | Reviewed and accepted |
+| 02 | [Stats client, backfill sync & command](02_stats-sync-and-command.md) | Complete | Reviewed and accepted |
+| 03 | [Backfill coverage report](03_coverage-report.md) | In Progress | |
 
 ## Definition of Done
 

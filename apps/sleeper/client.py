@@ -76,7 +76,23 @@ class TransactionSource(Protocol):
     def get_traded_picks(self, league_id: str) -> list[dict[str, Any]]: ...
 
 
-class SleeperAPI(LeagueSource, TrendingSource, TransactionSource, Protocol):
+class StatsSource(Protocol):
+    """What ``sync_stats`` needs."""
+
+    def get_nfl_state(self) -> dict[str, Any]: ...
+
+    def get_player_stats(
+        self, season: str, week: int, season_type: str = ...
+    ) -> dict[str, Any]: ...
+
+    def get_player_projections(
+        self, season: str, week: int, season_type: str = ...
+    ) -> dict[str, Any]: ...
+
+
+class SleeperAPI(
+    LeagueSource, TrendingSource, TransactionSource, StatsSource, Protocol
+):
     """The full API surface — everything ``SleeperClient`` provides."""
 
 
@@ -220,3 +236,18 @@ class SleeperClient:
     def get_traded_picks(self, league_id: str) -> list[dict[str, Any]]:
         """Draft picks that have changed hands — the current-ownership snapshot."""
         return self._get(f"league/{league_id}/traded_picks", missing_ok=True) or []
+
+    def get_player_stats(
+        self, season: str, week: int, season_type: str = "regular"
+    ) -> dict[str, Any]:
+        """Every player's actual stat line for one NFL week, keyed by player_id.
+
+        A season/week Sleeper has no data for returns ``null`` → ``{}`` here.
+        """
+        return self._get(f"stats/nfl/{season_type}/{season}/{week}") or {}
+
+    def get_player_projections(
+        self, season: str, week: int, season_type: str = "regular"
+    ) -> dict[str, Any]:
+        """Every player's projected stat line for one NFL week, keyed by player_id."""
+        return self._get(f"projections/nfl/{season_type}/{season}/{week}") or {}

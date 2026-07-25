@@ -72,3 +72,6 @@ class SyncRunTests(TestCase):
         run = SyncRun.objects.create(kind=SyncRun.Kind.PLAYERS)
         self.assertIn("players", str(run))
         self.assertIn("running", str(run))
+
+    def test_stats_kind_available(self) -> None:
+        self.assertEqual(SyncRun.Kind.STATS, "stats")

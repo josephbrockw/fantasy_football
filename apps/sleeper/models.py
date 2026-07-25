@@ -22,6 +22,7 @@ class SyncRun(TimeStampedModel):
         LEAGUE = "league", "League"
         TRENDING = "trending", "Trending"
         TRANSACTIONS = "transactions", "Transactions"
+        STATS = "stats", "Stats"
 
     class Status(models.TextChoices):
         RUNNING = "running", "Running"

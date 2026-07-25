@@ -23,6 +23,7 @@ make quality              # ruff check --fix, ruff format, mypy
 make sync-players         # pull the Sleeper player universe
 make sync-league          # pull leagues/rosters (needs SLEEPER_USERNAME in .env)
 make sync-trending        # pull trending add/drop counts (free-agent board)
+make sync-transactions    # pull completed trades + traded-pick ownership (needs sync-league first)
 ```
 
 Postgres is published on host port **5433**, not 5432, to avoid colliding with a
@@ -34,9 +35,11 @@ local Postgres install.
 - `apps/core/` — the shared `TimeStampedModel` abstract base
 - `apps/sleeper/` — API client, sync services, `SyncRun` audit log
 - `apps/players/` — the `Player` universe
-- `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, plus
-  all the server-rendered views and templates: the dashboard (the site root),
-  league overview, roster / team detail, and the free-agent board
+- `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, and
+  the trade layer (`Trade`, `TradeAsset`, `TradedPick`, synced by
+  `apps/leagues/transactions.py`), plus all the server-rendered views and
+  templates: the dashboard (the site root), league overview, roster / team
+  detail, the free-agent board, and the trades / pick-ownership view
 - `apps/scouting/` — `Target` (per-league acquire/avoid, tier, priority) and
   `ScoutingNote`; the per-league rookie draft board and targets board, plus a
   collapsible inline target control reused on the roster screens

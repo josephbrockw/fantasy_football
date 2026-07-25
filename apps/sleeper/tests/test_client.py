@@ -68,6 +68,30 @@ class SleeperClientTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             client.get_trending_players(kind="sideways")
 
+    def test_get_player_stats_hits_path(self) -> None:
+        client, session = self.build(fake_response(payload={"7564": {"pts_ppr": 20}}))
+
+        result = client.get_player_stats("2024", 3)
+
+        self.assertEqual(result, {"7564": {"pts_ppr": 20}})
+        self.assertEqual(
+            session.get.call_args.args[0], f"{BASE_URL}/stats/nfl/regular/2024/3"
+        )
+
+    def test_get_player_projections_hits_path(self) -> None:
+        client, session = self.build(fake_response(payload={"7564": {}}))
+
+        client.get_player_projections("2024", 3)
+
+        self.assertEqual(
+            session.get.call_args.args[0], f"{BASE_URL}/projections/nfl/regular/2024/3"
+        )
+
+    def test_stats_endpoints_default_to_empty_dict(self) -> None:
+        client, _ = self.build(fake_response(payload=None))
+        self.assertEqual(client.get_player_stats("2024", 3), {})
+        self.assertEqual(client.get_player_projections("2024", 3), {})
+
     def test_non_200_raises(self) -> None:
         client, _ = self.build(fake_response(status_code=503))
         with self.assertRaises(SleeperAPIError) as ctx:
