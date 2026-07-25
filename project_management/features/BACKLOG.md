@@ -4,11 +4,6 @@ Future features, not yet planned. Promote one with the `pm-planner` subagent,
 which assigns the next `NNN`, scaffolds the feature directory, and removes the
 line from here.
 
-- **Targets & scouting** — A `Target` model (player, tier, acquire/avoid,
-  priority, notes) and `ScoutingNote` for free-form observations. Rookie scouting
-  board filtered on `metadata.rookie_year` / `years_exp == 0`; the Sleeper player
-  dump already carries 233 fantasy-relevant 2026 rookies with NFL team and
-  college, so no manual prospect entry is needed.
 - **Transactions, trades & traded picks** — Ingest
   `/league/<id>/transactions/<week>` and `/league/<id>/traded_picks`. Draft-pick
   ownership is dynasty's second currency and is invisible without this.

@@ -22,6 +22,7 @@ make coverage
 make quality              # ruff check --fix, ruff format, mypy
 make sync-players         # pull the Sleeper player universe
 make sync-league          # pull leagues/rosters (needs SLEEPER_USERNAME in .env)
+make sync-trending        # pull trending add/drop counts (free-agent board)
 ```
 
 Postgres is published on host port **5433**, not 5432, to avoid colliding with a
@@ -30,11 +31,13 @@ local Postgres install.
 ## Layout
 
 - `config/` — Django project (env-driven `settings.py` via django-environ)
-- `apps/core/` — `TimeStampedModel`, base template, dashboard
+- `apps/core/` — the shared `TimeStampedModel` abstract base
 - `apps/sleeper/` — API client, sync services, `SyncRun` audit log
 - `apps/players/` — the `Player` universe
-- `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`
-- `templates/`, `static/` — Django templates, HTMX, and a built Tailwind stylesheet
+- `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, plus
+  all the server-rendered views and templates: the dashboard (the site root),
+  league overview, roster / team detail, and the free-agent board
+- `templates/base.html`, `static/` — the base layout, HTMX, and a built Tailwind stylesheet
 
 Frontend is server-rendered Django templates with HTMX for partial updates and
 Tailwind for styling. Tailwind is compiled by the standalone binary via

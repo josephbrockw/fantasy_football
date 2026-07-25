@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.sleeper",
     "apps.players",
     "apps.leagues",
+    "apps.scouting",
 ]
 
 MIDDLEWARE = [
