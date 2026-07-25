@@ -20,39 +20,39 @@ log, and the `Player` universe, and touches no existing views.
 
 <!-- Concrete, verifiable outcomes. Each one must be independently checkable. -->
 
-- [ ] A single `PlayerWeekStat` model stores one row per
+- [x] A single `PlayerWeekStat` model stores one row per
       `(player, season, week, season_type, kind)` where `kind` is `stat` or
       `projection`, carrying the full Sleeper stat-category dict in a JSONField
       plus promoted, nullable scoring columns (`pts_ppr`, `pts_half_ppr`,
       `pts_std`). It has a `unique_together` on that key and migrations, and is
       registered in the admin. One table with a `kind` discriminator is used for
       both endpoints (justified in PR 01).
-- [ ] `SleeperClient` exposes `get_player_stats(season, week, ...)` and
+- [x] `SleeperClient` exposes `get_player_stats(season, week, ...)` and
       `get_player_projections(season, week, ...)` hitting
       `/v1/stats/nfl/{season_type}/{season}/{week}` and
       `/v1/projections/nfl/{season_type}/{season}/{week}`; both tolerate an empty
       (`{}` / `null`) body for a season/week Sleeper has no data for, and no test
       hits the network.
-- [ ] `make sync-stats` runs a backfill: with no arguments it pulls **every**
+- [x] `make sync-stats` runs a backfill: with no arguments it pulls **every**
       season from the configured earliest through the current season (resolved
       from `get_nfl_state`), weeks 1–18, for **both** stats and projections; a
       season/week/kind range can be narrowed via flags, and a `--kind` flag can
       restrict to just stats or just projections.
-- [ ] The sync is **idempotent**: re-running over the same range updates rows in
+- [x] The sync is **idempotent**: re-running over the same range updates rows in
       place via bulk upsert (`bulk_create(update_conflicts=True)`) with no
       duplicates, and `updated_at` is refreshed explicitly (the
       `TimeStampedModel` `auto_now` is bypassed by bulk writes).
-- [ ] Stat rows for player ids **not** in the `Player` table are skipped and
+- [x] Stat rows for player ids **not** in the `Player` table are skipped and
       counted (mirroring `sync_trending`), so a full week of ~550 KB keyed by the
       whole Sleeper universe never fails on a missing foreign key and storage
       stays bounded to tracked players.
-- [ ] Every run is wrapped in a `SyncRun` (new `stats` kind) that records
+- [x] Every run is wrapped in a `SyncRun` (new `stats` kind) that records
       rows written and skipped, and captures failure without leaving a
       half-recorded run.
-- [ ] A coverage report (`python manage.py stats_coverage`) prints, per season,
+- [x] A coverage report (`python manage.py stats_coverage`) prints, per season,
       which weeks have stat and projection rows and the row counts, so a backfill
       can be verified at a glance.
-- [ ] `make test`, `make coverage`, and `make quality` all pass; new code is
+- [x] `make test`, `make coverage`, and `make quality` all pass; new code is
       covered.
 
 ## Pull requests
@@ -65,17 +65,17 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 |----|----|--------|-------|
 | 01 | [PlayerWeekStat model & migration](01_playerweekstat-model.md) | Complete | Reviewed and accepted |
 | 02 | [Stats client, backfill sync & command](02_stats-sync-and-command.md) | Complete | Reviewed and accepted |
-| 03 | [Backfill coverage report](03_coverage-report.md) | In Progress | |
+| 03 | [Backfill coverage report](03_coverage-report.md) | Complete | Reviewed and accepted |
 
 ## Definition of Done
 
 The feature is complete only when every box is checked. Then finalize the docs
 and move this directory to `features/archived/`.
 
-- [ ] All acceptance criteria verified
-- [ ] All new/changed code has test coverage
-- [ ] All tests pass (`make test` / `test-runner`)
-- [ ] Coverage confirmed (`make coverage` / `coverage-runner`)
-- [ ] Code quality confirmed (`make quality` / `quality-runner`)
-- [ ] No outstanding build errors
-- [ ] Documentation updated
+- [x] All acceptance criteria verified
+- [x] All new/changed code has test coverage
+- [x] All tests pass (`make test` / `test-runner`)
+- [x] Coverage confirmed (`make coverage` / `coverage-runner`)
+- [x] Code quality confirmed (`make quality` / `quality-runner`)
+- [x] No outstanding build errors
+- [x] Documentation updated

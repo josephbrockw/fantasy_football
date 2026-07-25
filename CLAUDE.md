@@ -24,7 +24,11 @@ make sync-players         # pull the Sleeper player universe
 make sync-league          # pull leagues/rosters (needs SLEEPER_USERNAME in .env)
 make sync-trending        # pull trending add/drop counts (free-agent board)
 make sync-transactions    # pull completed trades + traded-pick ownership (needs sync-league first)
+make sync-stats           # backfill weekly player stats & projections (ML substrate)
 ```
+
+`python manage.py stats_coverage` prints a per-season/week grid of stored stat
+and projection counts — a read-only way to verify a `sync-stats` backfill.
 
 Postgres is published on host port **5433**, not 5432, to avoid colliding with a
 local Postgres install.
@@ -34,7 +38,8 @@ local Postgres install.
 - `config/` — Django project (env-driven `settings.py` via django-environ)
 - `apps/core/` — the shared `TimeStampedModel` abstract base
 - `apps/sleeper/` — API client, sync services, `SyncRun` audit log
-- `apps/players/` — the `Player` universe
+- `apps/players/` — the `Player` universe, plus `PlayerWeekStat` (weekly stats &
+  projections, backfilled by `sync_stats`) — the substrate for the ML valuation work
 - `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, and
   the trade layer (`Trade`, `TradeAsset`, `TradedPick`, synced by
   `apps/leagues/transactions.py`), plus all the server-rendered views and
