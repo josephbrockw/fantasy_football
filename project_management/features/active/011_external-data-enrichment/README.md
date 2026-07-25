@@ -98,9 +98,9 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 
 | # | PR | Status | Notes |
 |----|----|--------|-------|
-| 01 | [PlayerProfile model, enrichment app & migration](01_playerprofile-model.md) | Planned | |
-| 02 | [Draft-capital loader, sync & command](02_draft-capital-loader-and-sync.md) | Planned | The `sleeper_id` crosswalk lives here |
-| 03 | [Combine athleticism enrichment](03_combine-athleticism.md) | Planned | Joins via `pfr_id` from PR 02 |
+| 01 | [PlayerProfile model, enrichment app & migration](01_playerprofile-model.md) | Complete | Reviewed and accepted |
+| 02 | [Draft-capital loader, sync & command](02_draft-capital-loader-and-sync.md) | Complete | The `sleeper_id` crosswalk lives here. Reviewed and accepted |
+| 03 | [Combine athleticism enrichment](03_combine-athleticism.md) | In Progress | Joins via `pfr_id` from PR 02 |
 
 ## Out of scope (stated explicitly)
 

@@ -1,6 +1,6 @@
 .PHONY: help build up down restart logs shell dbshell migrate makemigrations \
         superuser test coverage quality fmt css sync-players sync-league sync-trending \
-        sync-transactions sync-stats
+        sync-transactions sync-stats sync-profiles
 
 DC := docker compose
 EXEC := $(DC) exec web
@@ -71,3 +71,6 @@ sync-transactions:  ## Sync trades and traded draft picks
 
 sync-stats:  ## Backfill weekly player stats & projections
 	$(EXEC) python manage.py sync_stats $(ARGS)
+
+sync-profiles:  ## Enrich players with external draft capital & ids
+	$(EXEC) python manage.py sync_profiles $(ARGS)

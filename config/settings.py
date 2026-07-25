@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.sleeper",
     "apps.players",
+    "apps.enrichment",
     "apps.leagues",
     "apps.scouting",
 ]

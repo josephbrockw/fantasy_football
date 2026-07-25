@@ -23,6 +23,7 @@ class SyncRun(TimeStampedModel):
         TRENDING = "trending", "Trending"
         TRANSACTIONS = "transactions", "Transactions"
         STATS = "stats", "Stats"
+        PROFILES = "profiles", "Profiles"
 
     class Status(models.TextChoices):
         RUNNING = "running", "Running"

@@ -75,3 +75,6 @@ class SyncRunTests(TestCase):
 
     def test_stats_kind_available(self) -> None:
         self.assertEqual(SyncRun.Kind.STATS, "stats")
+
+    def test_profiles_kind_available(self) -> None:
+        self.assertEqual(SyncRun.Kind.PROFILES, "profiles")
