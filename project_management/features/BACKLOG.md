@@ -4,15 +4,8 @@ Future features, not yet planned. Promote one with the `pm-planner` subagent,
 which assigns the next `NNN`, scaffolds the feature directory, and removes the
 line from here.
 
-- **Transactions, trades & traded picks** — Ingest
-  `/league/<id>/transactions/<week>` and `/league/<id>/traded_picks`. Draft-pick
-  ownership is dynasty's second currency and is invisible without this.
 - **Rookie draft board** — `/league/<id>/drafts` and `/draft/<id>/picks`, to run
   the rookie draft against the scouting board from the targets feature.
-- **Stats & projections ingestion** — The undocumented but working
-  `/v1/stats/nfl/regular/{season}/{week}` and
-  `/v1/projections/nfl/regular/{season}/{week}` endpoints (~550 KB/week).
-  This is the training substrate for the ML work below and should land first.
 - **ML dynasty valuation** — Player values and trade evaluation built on the
   ingested stats. Needed because Sleeper exposes no usable ranking of its own:
   `search_rank` is a coarse search-ordering hint with heavy collisions (1,436

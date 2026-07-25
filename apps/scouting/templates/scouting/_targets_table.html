@@ -1,0 +1,59 @@
+{% comment %}
+Swappable targets table, grouped by stance. Each row shows where the player is
+currently rostered (with a "my team" marker) so the board is geared toward my
+team's next move.
+{% endcomment %}
+<div class="px-1 pb-2 text-xs text-slate-500">
+  {{ count }} target{{ count|pluralize }}{% if stance %} · {{ stance }}{% endif %}
+</div>
+
+<div class="overflow-x-auto rounded-lg border border-slate-800">
+  <table class="w-full text-left text-sm">
+    <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500">
+      <tr>
+        <th class="px-4 py-2 font-medium">Player</th>
+        <th class="px-4 py-2 font-medium">Pos</th>
+        <th class="px-4 py-2 font-medium">NFL</th>
+        <th class="px-4 py-2 text-right font-medium">Age</th>
+        <th class="px-4 py-2 text-right font-medium">Exp</th>
+        <th class="px-4 py-2 text-right font-medium">Rookie</th>
+        <th class="px-4 py-2 font-medium">Status</th>
+        <th class="px-4 py-2 font-medium">Rostered by</th>
+        <th class="px-4 py-2 font-medium">Target</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800">
+      {% for group in groups %}
+        <tr class="{% if group.key == 'acquire' %}bg-emerald-500/5{% else %}bg-red-500/5{% endif %}">
+          <td colspan="9" class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider
+                     {% if group.key == 'acquire' %}text-emerald-400{% else %}text-red-400{% endif %}">
+            {{ group.key }}
+            <span class="ml-1 font-normal text-slate-600">({{ group.players|length }})</span>
+          </td>
+        </tr>
+        {% for player in group.players %}
+          <tr class="hover:bg-slate-900/40">
+            {% include "leagues/_player_row.html" %}
+            <td class="px-4 py-2 text-slate-400">
+              {% if player.rostered_team_id %}
+                <a href="{% url 'leagues:team_detail' player.rostered_team_id %}"
+                   class="hover:text-slate-200">{{ player.rostered_team|default:player.rostered_manager|default:"—" }}</a>
+                {% if player.rostered_by_me %}
+                  <span class="ml-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-xs font-medium text-sky-400">mine</span>
+                {% endif %}
+              {% else %}
+                <span class="text-slate-600">free agent</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2">{% include "scouting/_target_controls.html" %}</td>
+          </tr>
+        {% endfor %}
+      {% empty %}
+        <tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-500">
+          No targets yet — mark players Acquire or Avoid from the rookie board, a
+          roster, or the free-agent board.
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

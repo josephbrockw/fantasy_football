@@ -37,6 +37,9 @@ local Postgres install.
 - `apps/leagues/` — `League`, `LeagueSeason`, `Manager`, `Team`, `RosterSlot`, plus
   all the server-rendered views and templates: the dashboard (the site root),
   league overview, roster / team detail, and the free-agent board
+- `apps/scouting/` — `Target` (per-league acquire/avoid, tier, priority) and
+  `ScoutingNote`; the per-league rookie draft board and targets board, plus a
+  collapsible inline target control reused on the roster screens
 - `templates/base.html`, `static/` — the base layout, HTMX, and a built Tailwind stylesheet
 
 Frontend is server-rendered Django templates with HTMX for partial updates and

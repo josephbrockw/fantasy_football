@@ -7,6 +7,9 @@ from apps.leagues.models import (
     RosterSlot,
     SleeperAccount,
     Team,
+    Trade,
+    TradeAsset,
+    TradedPick,
 )
 
 
@@ -71,3 +74,47 @@ class TeamAdmin(admin.ModelAdmin):
     list_filter = ("league_season__season", "league_season__league")
     search_fields = ("team_name", "manager__display_name")
     inlines = [RosterSlotInline]
+
+
+class TradeAssetInline(admin.TabularInline):
+    model = TradeAsset
+    extra = 0
+    fields = (
+        "kind",
+        "player",
+        "pick_season",
+        "pick_round",
+        "faab_amount",
+        "from_team",
+        "to_team",
+    )
+    autocomplete_fields = ("player",)
+
+
+@admin.register(Trade)
+class TradeAdmin(admin.ModelAdmin):
+    list_display = (
+        "sleeper_transaction_id",
+        "league_season",
+        "week",
+        "status",
+        "status_updated",
+    )
+    list_filter = ("league_season__season", "league_season__league")
+    inlines = [TradeAssetInline]
+
+
+@admin.register(TradedPick)
+class TradedPickAdmin(admin.ModelAdmin):
+    list_display = (
+        "season",
+        "round",
+        "original_owner",
+        "current_owner",
+        "league_season",
+    )
+    list_filter = ("season", "league_season__league")
+    search_fields = (
+        "original_owner__display_name",
+        "current_owner__display_name",
+    )

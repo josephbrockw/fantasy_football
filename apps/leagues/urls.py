@@ -21,6 +21,7 @@ urlpatterns = [
         views.FreeAgentTableView.as_view(),
         name="free_agents_table",
     ),
+    path("league/<slug:slug>/trades/", views.TradesView.as_view(), name="trades"),
     path("team/<int:pk>/", views.TeamDetailView.as_view(), name="team_detail"),
     path(
         "team/<int:pk>/reserves/",

@@ -66,7 +66,17 @@ class LeagueSource(PlayerSource, Protocol):
     def get_league_users(self, league_id: str) -> list[dict[str, Any]]: ...
 
 
-class SleeperAPI(LeagueSource, TrendingSource, Protocol):
+class TransactionSource(Protocol):
+    """What ``sync_transactions`` needs."""
+
+    def get_league_transactions(
+        self, league_id: str, week: int
+    ) -> list[dict[str, Any]]: ...
+
+    def get_traded_picks(self, league_id: str) -> list[dict[str, Any]]: ...
+
+
+class SleeperAPI(LeagueSource, TrendingSource, TransactionSource, Protocol):
     """The full API surface — everything ``SleeperClient`` provides."""
 
 
@@ -194,3 +204,19 @@ class SleeperClient:
 
     def get_league_users(self, league_id: str) -> list[dict[str, Any]]:
         return self._get(f"league/{league_id}/users") or []
+
+    def get_league_transactions(
+        self, league_id: str, week: int
+    ) -> list[dict[str, Any]]:
+        """All transactions for one week — trades, waivers, and FA moves.
+
+        Per-week; callers filter to the types they want. A purged/unknown league
+        404s → ``[]``, the same swallow ``get_league_rosters`` uses.
+        """
+        return (
+            self._get(f"league/{league_id}/transactions/{week}", missing_ok=True) or []
+        )
+
+    def get_traded_picks(self, league_id: str) -> list[dict[str, Any]]:
+        """Draft picks that have changed hands — the current-ownership snapshot."""
+        return self._get(f"league/{league_id}/traded_picks", missing_ok=True) or []

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Targets · {{ league.name }} · Dynasty HQ{% endblock %}
+
+{% block nav %}{% include "_league_nav.html" with active="targets" %}{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-baseline justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight text-white">Targets</h1>
+    <p class="text-sm text-slate-500">{{ league.name }} · who to chase or steer clear of</p>
+  </div>
+
+  <form class="mt-6 flex flex-wrap items-center gap-2"
+        hx-get="{% url 'scouting:target_board_table' league.slug %}"
+        hx-target="#board"
+        hx-swap="innerHTML"
+        hx-trigger="change">
+    <span class="text-xs uppercase tracking-wider text-slate-500">Stance</span>
+    <label class="cursor-pointer">
+      <input type="radio" name="stance" value="" class="peer sr-only"
+             {% if not stance %}checked{% endif %}>
+      <span class="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400
+                   peer-checked:border-sky-500 peer-checked:bg-sky-500/15
+                   peer-checked:text-sky-300">All</span>
+    </label>
+    {% for value, label in stance_filters %}
+      <label class="cursor-pointer">
+        <input type="radio" name="stance" value="{{ value }}" class="peer sr-only"
+               {% if stance == value %}checked{% endif %}>
+        <span class="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400
+                     peer-checked:border-sky-500 peer-checked:bg-sky-500/15
+                     peer-checked:text-sky-300">{{ label }}</span>
+      </label>
+    {% endfor %}
+  </form>
+
+  <div id="board" class="mt-6">
+    {% include "scouting/_targets_table.html" %}
+  </div>
+{% endblock %}

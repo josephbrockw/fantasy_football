@@ -200,3 +200,127 @@ class RosterSlot(TimeStampedModel):
         if self.lineup_position:
             return f"{self.player} — {self.lineup_position}"
         return f"{self.player} — {self.slot}"
+
+
+class Trade(TimeStampedModel):
+    """A completed trade within a single ``LeagueSeason``.
+
+    Hangs off the season, not the permanent ``League``, because a trade happens
+    between rosters within one season. ``sleeper_transaction_id`` is the
+    idempotency key the sync upserts on.
+    """
+
+    league_season = models.ForeignKey(
+        LeagueSeason, on_delete=models.CASCADE, related_name="trades"
+    )
+    sleeper_transaction_id = models.CharField(max_length=32, unique=True)
+    week = models.PositiveIntegerField()
+    # Stored verbatim (Sleeper sends "complete") rather than assuming the value.
+    status = models.CharField(max_length=16, blank=True)
+    # Sleeper's status_updated is epoch milliseconds; the sync converts it to an
+    # aware datetime before storing.
+    status_updated = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-status_updated"]
+        indexes = [models.Index(fields=["league_season", "-status_updated"])]
+
+    def __str__(self) -> str:
+        return f"Trade {self.sleeper_transaction_id} (wk {self.week})"
+
+
+class TradeAsset(TimeStampedModel):
+    """One asset moving in a trade: a player, a draft pick, or FAAB.
+
+    Sleeper spreads a trade across three parallel structures (``adds``/``drops``
+    map ``player_id`` → ``roster_id``, ``draft_picks`` is a list,
+    ``waiver_budget`` is FAAB); this models their union with a ``kind``
+    discriminator rather than three tables. The sending/receiving *manager* is
+    reachable via ``from_team.manager`` / ``to_team.manager`` — ``Team`` is the
+    right grain because a trade is season-scoped.
+    """
+
+    class Kind(models.TextChoices):
+        PLAYER = "player", "Player"
+        PICK = "pick", "Pick"
+        FAAB = "faab", "FAAB"
+
+    trade = models.ForeignKey(Trade, on_delete=models.CASCADE, related_name="assets")
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    # PROTECT, not CASCADE: deleting a player must never silently erase trade
+    # history.
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="trade_assets",
+    )
+    pick_season = models.CharField(max_length=8, blank=True)
+    pick_round = models.PositiveIntegerField(null=True, blank=True)
+    faab_amount = models.PositiveIntegerField(null=True, blank=True)
+    from_team = models.ForeignKey(
+        Team,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assets_sent",
+    )
+    to_team = models.ForeignKey(
+        Team,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assets_received",
+    )
+
+    class Meta:
+        ordering = ["kind"]
+
+    @property
+    def label(self) -> str:
+        """A kind-agnostic label, so templates don't branch on ``kind``."""
+        if self.kind == self.Kind.PLAYER:
+            return str(self.player) if self.player_id else "—"
+        if self.kind == self.Kind.PICK:
+            return f"{self.pick_season} R{self.pick_round} pick"
+        if self.kind == self.Kind.FAAB:
+            return f"${self.faab_amount} FAAB"
+        return "—"
+
+    def __str__(self) -> str:
+        return self.label
+
+
+class TradedPick(TimeStampedModel):
+    """Current ownership of a future draft pick (a snapshot, not history).
+
+    The snapshot Sleeper returns from ``/traded_picks``, rebuilt wholesale on
+    each sync (like ``RosterSlot`` / ``TrendingPlayer`` are replaced, not
+    diffed). The pick's ``season`` is often a future year with no
+    ``LeagueSeason`` row yet, which is exactly why owners key on ``Manager`` (the
+    cross-season-stable ``sleeper_user_id``), not ``Team``: ``roster_id`` is
+    season-scoped and never a cross-season key.
+    """
+
+    league_season = models.ForeignKey(
+        LeagueSeason, on_delete=models.CASCADE, related_name="traded_picks"
+    )
+    # The pick's own season, e.g. "2027" — often a future year.
+    season = models.CharField(max_length=8)
+    round = models.PositiveIntegerField()
+    original_owner = models.ForeignKey(
+        Manager, on_delete=models.CASCADE, related_name="picks_originally_owned"
+    )
+    current_owner = models.ForeignKey(
+        Manager, on_delete=models.CASCADE, related_name="picks_owned"
+    )
+
+    class Meta:
+        # A pick is identified by whose it originally was.
+        unique_together = ("league_season", "season", "round", "original_owner")
+        ordering = ["season", "round"]
+        indexes = [models.Index(fields=["league_season", "season"])]
+
+    def __str__(self) -> str:
+        return f"{self.season} R{self.round} pick"

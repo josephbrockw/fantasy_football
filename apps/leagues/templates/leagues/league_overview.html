@@ -2,6 +2,8 @@
 
 {% block title %}{{ league.name }} · Dynasty HQ{% endblock %}
 
+{% block nav %}{% include "_league_nav.html" with active="overview" %}{% endblock %}
+
 {% block content %}
   <div class="flex flex-wrap items-center justify-between gap-4">
     <div class="flex items-baseline gap-4">

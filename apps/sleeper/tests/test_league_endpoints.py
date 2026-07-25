@@ -76,10 +76,32 @@ class LeagueEndpointTests(SimpleTestCase):
         self.assertEqual(len(users), 1)
         self.assertEqual(session.get.call_args.args[0], f"{BASE_URL}/league/l1/users")
 
+    def test_get_league_transactions(self) -> None:
+        client, session = self.build([{"transaction_id": "t1", "type": "trade"}])
+
+        txns = client.get_league_transactions("l1", 3)
+
+        self.assertEqual(len(txns), 1)
+        self.assertEqual(
+            session.get.call_args.args[0], f"{BASE_URL}/league/l1/transactions/3"
+        )
+
+    def test_get_traded_picks(self) -> None:
+        client, session = self.build([{"season": "2027", "round": 1}])
+
+        picks = client.get_traded_picks("l1")
+
+        self.assertEqual(len(picks), 1)
+        self.assertEqual(
+            session.get.call_args.args[0], f"{BASE_URL}/league/l1/traded_picks"
+        )
+
     def test_list_endpoints_default_to_empty(self) -> None:
         client, _ = self.build(None)
         self.assertEqual(client.get_league_rosters("l1"), [])
         self.assertEqual(client.get_league_users("l1"), [])
+        self.assertEqual(client.get_league_transactions("l1", 1), [])
+        self.assertEqual(client.get_traded_picks("l1"), [])
 
 
 class NotFoundHandlingTests(SimpleTestCase):
@@ -100,6 +122,11 @@ class NotFoundHandlingTests(SimpleTestCase):
 
     def test_get_league_rosters_returns_empty_on_404(self) -> None:
         self.assertEqual(self.build_404().get_league_rosters("gone"), [])
+
+    def test_transaction_endpoints_return_empty_on_404(self) -> None:
+        client = self.build_404()
+        self.assertEqual(client.get_league_transactions("gone", 1), [])
+        self.assertEqual(client.get_traded_picks("gone"), [])
 
     def test_other_endpoints_still_raise_on_404(self) -> None:
         client = self.build_404()

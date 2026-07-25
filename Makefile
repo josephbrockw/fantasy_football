@@ -1,5 +1,6 @@
 .PHONY: help build up down restart logs shell dbshell migrate makemigrations \
-        superuser test coverage quality fmt css sync-players sync-league sync-trending
+        superuser test coverage quality fmt css sync-players sync-league sync-trending \
+        sync-transactions
 
 DC := docker compose
 EXEC := $(DC) exec web
@@ -32,8 +33,8 @@ dbshell:  ## Postgres shell
 migrate:  ## Apply migrations
 	$(EXEC) python manage.py migrate
 
-makemigrations:  ## Generate migrations
-	$(EXEC) python manage.py makemigrations
+makemigrations:  ## Generate migrations (ARGS="<app> --name <descriptive>")
+	$(EXEC) python manage.py makemigrations $(ARGS)
 
 superuser:  ## Create an admin user
 	$(EXEC) python manage.py createsuperuser
@@ -64,3 +65,6 @@ sync-league:  ## Sync leagues, rosters, and managers
 
 sync-trending:  ## Sync trending adds/drops
 	$(EXEC) python manage.py sync_trending $(ARGS)
+
+sync-transactions:  ## Sync trades and traded draft picks
+	$(EXEC) python manage.py sync_transactions $(ARGS)

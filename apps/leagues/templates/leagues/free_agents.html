@@ -2,10 +2,7 @@
 
 {% block title %}Free agents · {{ league.name }} · Dynasty HQ{% endblock %}
 
-{% block nav %}
-  <a href="{% url 'leagues:league_overview' league.slug %}"
-     class="hover:text-slate-200">{{ league.name }}</a>
-{% endblock %}
+{% block nav %}{% include "_league_nav.html" with active="free_agents" %}{% endblock %}
 
 {% block content %}
   <div class="flex flex-wrap items-baseline justify-between gap-3">

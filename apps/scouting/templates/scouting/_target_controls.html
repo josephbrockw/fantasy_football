@@ -1,55 +1,90 @@
 {% comment %}
-Inline target + note controls for one player (the row's last <td>). Posts to
-set_target / add_note and swaps the whole row. `player.target` is a reverse
-OneToOne that fails silently in templates when absent (→ "— none —").
+Reusable, collapsible target + note control for one (player, league). Collapsed
+it's just a compact badge; clicking expands the editor inline (a floating
+popover would be clipped by the tables' overflow-x-auto). Self-contained and
+swappable: the forms post to set_target / add_note and replace this element
+(#tc-<league>-<player>). Needs `player` (annotated target_stance / target_tier /
+target_priority / note_count), `league`, stances / priorities / tiers, and an
+optional `controls_open` flag (kept open across edits).
 {% endcomment %}
-<td class="px-4 py-2">
-  <div class="flex flex-wrap items-center gap-2">
-    <form hx-post="{% url 'scouting:set_target' player.pk %}"
-          hx-target="#player-row-{{ player.pk }}"
+<details id="tc-{{ league.pk }}-{{ player.pk }}"{% if controls_open %} open{% endif %}>
+  <summary class="flex cursor-pointer items-center gap-1.5">
+    {% if player.target_stance == 'acquire' %}
+      <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs font-medium text-emerald-400">
+        Acquire{% if player.target_tier %} · T{{ player.target_tier }}{% endif %}
+      </span>
+    {% elif player.target_stance == 'avoid' %}
+      <span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs font-medium text-red-400">
+        Avoid{% if player.target_tier %} · T{{ player.target_tier }}{% endif %}
+      </span>
+    {% else %}
+      <span class="rounded border border-slate-700 px-1.5 py-0.5 text-xs text-slate-500
+                   hover:border-slate-600 hover:text-slate-300">+ target</span>
+    {% endif %}
+    {% if player.note_count %}
+      <span class="text-xs text-slate-500" title="scouting notes">📝 {{ player.note_count }}</span>
+    {% endif %}
+  </summary>
+
+  <div class="mt-1 w-52 space-y-2 rounded-lg border border-slate-700 bg-slate-900 p-3">
+    <form hx-post="{% url 'scouting:set_target' league.slug player.pk %}"
+          hx-target="#tc-{{ league.pk }}-{{ player.pk }}"
           hx-swap="outerHTML"
           hx-trigger="change"
-          class="flex items-center gap-1.5">
+          class="space-y-2">
       {% csrf_token %}
-      <select name="stance"
-              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
-                     text-slate-200 focus:border-sky-500 focus:outline-none">
-        <option value="">— none —</option>
-        {% for value, label in stances %}
-          <option value="{{ value }}"
-                  {% if player.target.stance == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <select name="tier"
-              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
-                     text-slate-200 focus:border-sky-500 focus:outline-none">
-        <option value="">tier</option>
-        {% for n in tiers %}
-          <option value="{{ n }}" {% if player.target.tier == n %}selected{% endif %}>T{{ n }}</option>
-        {% endfor %}
-      </select>
-      <select name="priority"
-              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
-                     text-slate-200 focus:border-sky-500 focus:outline-none">
-        {% for value, label in priorities %}
-          <option value="{{ value }}"
-                  {% if player.target.priority == value %}selected{% elif not player.target and value == 'medium' %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <label class="block text-xs text-slate-500">
+        Stance
+        <select name="stance"
+                class="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1
+                       text-xs text-slate-200 focus:border-sky-500 focus:outline-none">
+          <option value="">— none —</option>
+          {% for value, label in stances %}
+            <option value="{{ value }}"
+                    {% if player.target_stance == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="flex gap-2">
+        <label class="block flex-1 text-xs text-slate-500">
+          Tier
+          <select name="tier"
+                  class="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1
+                         text-xs text-slate-200 focus:border-sky-500 focus:outline-none">
+            <option value="">—</option>
+            {% for n in tiers %}
+              <option value="{{ n }}" {% if player.target_tier == n %}selected{% endif %}>T{{ n }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="block flex-1 text-xs text-slate-500">
+          Priority
+          <select name="priority"
+                  class="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1
+                         text-xs text-slate-200 focus:border-sky-500 focus:outline-none">
+            {% for value, label in priorities %}
+              <option value="{{ value }}"
+                      {% if player.target_priority == value %}selected{% elif not player.target_stance and value == 'medium' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
     </form>
 
-    <form hx-post="{% url 'scouting:add_note' player.pk %}"
-          hx-target="#player-row-{{ player.pk }}"
+    <form hx-post="{% url 'scouting:add_note' league.slug player.pk %}"
+          hx-target="#tc-{{ league.pk }}-{{ player.pk }}"
           hx-swap="outerHTML"
-          class="flex items-center gap-1">
+          class="border-t border-slate-800 pt-2">
       {% csrf_token %}
-      <input type="text" name="body" placeholder="note…"
-             class="w-24 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs
+      <input type="text" name="body" placeholder="add note…"
+             class="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs
                     text-slate-200 placeholder:text-slate-600
                     focus:border-sky-500 focus:outline-none">
       {% if player.note_count %}
-        <span class="text-xs text-slate-500" title="scouting notes">📝 {{ player.note_count }}</span>
+        <p class="mt-1 text-right text-xs text-slate-500">
+          📝 {{ player.note_count }} note{{ player.note_count|pluralize }}
+        </p>
       {% endif %}
     </form>
   </div>
-</td>
+</details>

@@ -86,6 +86,63 @@ def make_roster(
     }
 
 
+def make_trade(
+    transaction_id: str,
+    *,
+    adds: dict[str, int] | None = None,
+    drops: dict[str, int] | None = None,
+    draft_picks: list[dict[str, Any]] | None = None,
+    waiver_budget: list[dict[str, Any]] | None = None,
+    leg: int = 1,
+    status: str = "complete",
+    status_updated: int | None = 1_700_000_000_000,
+) -> dict[str, Any]:
+    """A ``type == "trade"`` transaction payload (epoch-ms ``status_updated``)."""
+    return {
+        "transaction_id": transaction_id,
+        "type": "trade",
+        "status": status,
+        "leg": leg,
+        "status_updated": status_updated,
+        "adds": adds or {},
+        "drops": drops or {},
+        "draft_picks": draft_picks or [],
+        "waiver_budget": waiver_budget or [],
+    }
+
+
+def make_non_trade(
+    transaction_id: str, transaction_type: str = "waiver"
+) -> dict[str, Any]:
+    """A non-trade transaction (waiver / free_agent) — should be ignored."""
+    return {
+        "transaction_id": transaction_id,
+        "type": transaction_type,
+        "status": "complete",
+        "leg": 1,
+    }
+
+
+def make_traded_pick(
+    *,
+    season: str,
+    round: int,
+    roster_id: int,
+    owner_id: int,
+    previous_owner_id: int | None = None,
+) -> dict[str, Any]:
+    """A ``/traded_picks`` entry: ``roster_id`` is the original owner."""
+    return {
+        "season": season,
+        "round": round,
+        "roster_id": roster_id,
+        "previous_owner_id": (
+            previous_owner_id if previous_owner_id is not None else roster_id
+        ),
+        "owner_id": owner_id,
+    }
+
+
 class FakeLeagueClient:
     """Serves canned league data. Records calls; never touches the network."""
 
@@ -99,6 +156,8 @@ class FakeLeagueClient:
         players: dict[str, Any] | None = None,
         season: str = "2026",
         user_error: Exception | None = None,
+        transactions: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+        traded_picks: dict[str, list[dict[str, Any]]] | None = None,
     ) -> None:
         self.user = user if user is not None else make_user()
         self.user_leagues = user_leagues or []
@@ -108,6 +167,8 @@ class FakeLeagueClient:
         self.players = players if players is not None else load_players_fixture()
         self.season = season
         self.user_error = user_error
+        self.transactions = transactions or {}
+        self.traded_picks = traded_picks or {}
         self.calls: list[str] = []
 
     def get_nfl_state(self) -> dict[str, Any]:
@@ -147,6 +208,16 @@ class FakeLeagueClient:
     def get_league_users(self, league_id: str) -> list[dict[str, Any]]:
         self.calls.append(f"get_league_users:{league_id}")
         return self.users.get(league_id, [])
+
+    def get_league_transactions(
+        self, league_id: str, week: int
+    ) -> list[dict[str, Any]]:
+        self.calls.append(f"get_league_transactions:{league_id}:{week}")
+        return self.transactions.get((league_id, week), [])
+
+    def get_traded_picks(self, league_id: str) -> list[dict[str, Any]]:
+        self.calls.append(f"get_traded_picks:{league_id}")
+        return self.traded_picks.get(league_id, [])
 
 
 def unknown_user_client() -> FakeLeagueClient:

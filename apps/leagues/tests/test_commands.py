@@ -5,9 +5,16 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
-from apps.leagues.models import League, Team
-from apps.leagues.tests.factories import ME, FakeLeagueClient, make_league, make_roster
+from apps.leagues.models import League, LeagueSeason, Manager, Team
+from apps.leagues.tests.factories import (
+    ME,
+    FakeLeagueClient,
+    make_league,
+    make_roster,
+    make_traded_pick,
+)
 from apps.leagues.tests.test_services import LEAGUE_ID, roster_client
+from apps.leagues.tests.test_transactions import RaisingTransactionClient
 from apps.players.services import sync_players
 from apps.players.tests.utils import BRADY, FakeSleeperClient
 
@@ -76,3 +83,48 @@ class SyncLeagueCommandTests(TestCase):
 
         with self.assertRaises(CommandError):
             self.call(client=unknown_user_client())
+
+
+class SyncTransactionsCommandTests(TestCase):
+    league: League
+    season: LeagueSeason
+    me: Manager
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.league = League.objects.create(
+            name="The Dynasty", normalized_name="thedynasty", slug="the-dynasty"
+        )
+        cls.season = LeagueSeason.objects.create(
+            league=cls.league, season="2026", sleeper_league_id="l1"
+        )
+        cls.me = Manager.objects.create(sleeper_user_id="me", display_name="Me")
+        Team.objects.create(league_season=cls.season, roster_id=1, manager=cls.me)
+
+    def call(self, *args: str, client: FakeLeagueClient | None = None) -> str:
+        out = StringIO()
+        with mock.patch(
+            "apps.leagues.transactions.SleeperClient",
+            return_value=client or FakeLeagueClient(),
+        ):
+            call_command("sync_transactions", *args, stdout=out)
+        return out.getvalue()
+
+    def test_reports_summary(self) -> None:
+        picks = {
+            "l1": [make_traded_pick(season="2027", round=1, roster_id=1, owner_id=1)]
+        }
+        output = self.call(client=FakeLeagueClient(traded_picks=picks))
+        self.assertIn("traded pick(s)", output)
+
+    def test_reports_skipped(self) -> None:
+        # An orphan roster (no Team) is skipped and surfaced in the summary.
+        picks = {
+            "l1": [make_traded_pick(season="2027", round=1, roster_id=99, owner_id=1)]
+        }
+        output = self.call(client=FakeLeagueClient(traded_picks=picks))
+        self.assertIn("Skipped", output)
+
+    def test_api_error_becomes_command_error(self) -> None:
+        with self.assertRaises(CommandError):
+            self.call(client=RaisingTransactionClient())

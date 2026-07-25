@@ -18,7 +18,16 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView, TemplateView
 
-from apps.leagues.models import League, LeagueSeason, RosterSlot, Team
+from apps.leagues.models import (
+    League,
+    LeagueSeason,
+    Manager,
+    RosterSlot,
+    Team,
+    Trade,
+    TradeAsset,
+    TradedPick,
+)
 from apps.leagues.services import starting_slots
 from apps.players.models import Player, TrendingPlayer
 from apps.sleeper.models import SyncRun
@@ -248,6 +257,92 @@ class LeagueOverviewView(DetailView):
             .order_by("-wins", "-points_for")
             if season
             else Team.objects.none()
+        )
+        return context
+
+
+@dataclass
+class TradeSide:
+    """One manager and the assets they received in a trade."""
+
+    manager: Manager | None
+    is_me: bool
+    assets: list[TradeAsset]
+
+
+@dataclass
+class TradeSummary:
+    """A trade prepared for the template — grouped into receiving sides."""
+
+    trade: Trade
+    sides: list[TradeSide]
+
+
+def trade_summaries(season: LeagueSeason) -> list[TradeSummary]:
+    """Trades for a season, each grouped by receiving manager.
+
+    Grouping happens here (not in the template) the same way ``starting_lineup``
+    prepares rows — so the template stays logic-light and uses each asset's
+    ``label`` without branching on ``kind``.
+    """
+    trades = (
+        Trade.objects.filter(league_season=season)
+        .prefetch_related(
+            "assets__player",
+            "assets__from_team__manager",
+            "assets__to_team__manager",
+        )
+        .order_by("-status_updated")
+    )
+    summaries: list[TradeSummary] = []
+    for trade in trades:
+        sides: dict[Any, TradeSide] = {}
+        order: list[Any] = []
+        for asset in trade.assets.all():
+            manager = asset.to_team.manager if asset.to_team else None
+            key = manager.pk if manager else None
+            if key not in sides:
+                sides[key] = TradeSide(
+                    manager=manager,
+                    is_me=bool(manager and manager.is_me),
+                    assets=[],
+                )
+                order.append(key)
+            sides[key].assets.append(asset)
+        summaries.append(TradeSummary(trade=trade, sides=[sides[k] for k in order]))
+    return summaries
+
+
+class TradesView(DetailView):
+    """One league's trade history and current traded-pick ownership."""
+
+    model = League
+    slug_field = "slug"
+    template_name = "leagues/trades.html"
+    context_object_name = "league"
+
+    def pick_season(self, seasons: list[LeagueSeason]) -> LeagueSeason | None:
+        """The requested season, else the newest. ``seasons`` is newest-first."""
+        requested = self.request.GET.get("season")
+        if requested:
+            return next((s for s in seasons if s.season == requested), None)
+        return seasons[0] if seasons else None
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        league: League = self.object
+        seasons = list(league.seasons.all())
+        season = self.pick_season(seasons)
+
+        context["season"] = season
+        context["seasons"] = seasons
+        context["trades"] = trade_summaries(season) if season else []
+        context["traded_picks"] = (
+            TradedPick.objects.filter(league_season=season)
+            .select_related("original_owner", "current_owner")
+            .order_by("season", "round", "original_owner__display_name")
+            if season
+            else TradedPick.objects.none()
         )
         return context
 

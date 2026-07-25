@@ -3,18 +3,20 @@ from __future__ import annotations
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.leagues.models import League
 from apps.players.models import Player
 
 
 class Target(TimeStampedModel):
-    """My stance on a single player — someone to acquire or avoid.
+    """My stance on a player *within one league* — someone to acquire or avoid.
 
-    ``OneToOne`` because there is exactly one stance per player: setting a stance
-    is an ``update_or_create`` and clearing it is a delete. ``notes`` is a single
-    quick summary that rides on the target row; longer, dated observations live in
-    :class:`ScoutingNote`. Single-user app, so a target is implicitly mine — no
-    per-user scoping beyond the existing ``Manager.is_me`` the Targets board uses
-    only to label my roster versus a rival's.
+    Scoped to a ``League`` (the permanent record, so it survives Sleeper minting
+    a new ``league_id`` each season) because a target only means something
+    relative to a specific league's rosters: the same player can be a Tier 1
+    acquire in one league and untargeted in another. ``unique_together`` keeps it
+    to one stance per ``(player, league)`` — setting one is an
+    ``update_or_create`` and clearing it is a delete. ``notes`` is a quick
+    summary; longer, dated observations are :class:`ScoutingNote`.
     """
 
     class Stance(models.TextChoices):
@@ -26,9 +28,8 @@ class Target(TimeStampedModel):
         MEDIUM = "medium", "Medium"
         LOW = "low", "Low"
 
-    player = models.OneToOneField(
-        Player, on_delete=models.CASCADE, related_name="target"
-    )
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="targets")
+    league = models.ForeignKey(League, on_delete=models.CASCADE, related_name="targets")
     stance = models.CharField(max_length=8, choices=Stance.choices)
     tier = models.PositiveSmallIntegerField(null=True, blank=True)  # 1 = top tier
     priority = models.CharField(
@@ -36,20 +37,27 @@ class Target(TimeStampedModel):
     )
     notes = models.TextField(blank=True)  # short summary note
 
+    class Meta:
+        unique_together = ("player", "league")
+        ordering = ["stance", "tier", "priority"]
+
     def __str__(self) -> str:
-        return f"{self.player} — {self.get_stance_display()}"
+        return f"{self.player} — {self.get_stance_display()} ({self.league})"
 
 
 class ScoutingNote(TimeStampedModel):
-    """A dated, free-form observation about a player.
+    """A dated, free-form observation about a player within one league.
 
-    A one-to-many log (many notes per player), distinct from ``Target.notes`` and
-    independent of whether the player is a target at all — I can scout a prospect
-    before deciding a stance.
+    League-scoped like :class:`Target` so a scouting board stays in the context
+    of the league you're working. A one-to-many log, independent of whether a
+    stance is set.
     """
 
     player = models.ForeignKey(
         Player, on_delete=models.CASCADE, related_name="scouting_notes"
+    )
+    league = models.ForeignKey(
+        League, on_delete=models.CASCADE, related_name="scouting_notes"
     )
     body = models.TextField()
 
