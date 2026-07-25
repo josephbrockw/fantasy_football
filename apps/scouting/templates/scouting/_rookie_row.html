@@ -1,0 +1,10 @@
+{% comment %}
+One rookie row. Re-rendered on its own by the set_target / add_note endpoints
+(hx-swap="outerHTML" on #player-row-<pk>), so it must be a complete <tr>.
+Needs `player` (select_related "target", annotated `note_count`) plus `stances`,
+`priorities`, `tiers` in context.
+{% endcomment %}
+<tr id="player-row-{{ player.pk }}" class="hover:bg-slate-900/40">
+  {% include "leagues/_player_row.html" %}
+  {% include "scouting/_target_controls.html" %}
+</tr>

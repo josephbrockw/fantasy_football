@@ -48,7 +48,7 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 | # | PR | Status | Notes |
 |----|----|--------|-------|
 | 01 | [Scouting app & models](01_scouting-app-and-models.md) | Complete | Reviewed and accepted — 100% covered, quality clean |
-| 02 | [Rookie scouting board & inline management](02_rookie-scouting-board.md) | Planned | |
+| 02 | [Rookie scouting board & inline management](02_rookie-scouting-board.md) | In Progress | |
 | 03 | [Targets board](03_targets-board.md) | Planned | |
 
 ## Definition of Done

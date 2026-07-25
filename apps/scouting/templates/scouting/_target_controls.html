@@ -1,0 +1,55 @@
+{% comment %}
+Inline target + note controls for one player (the row's last <td>). Posts to
+set_target / add_note and swaps the whole row. `player.target` is a reverse
+OneToOne that fails silently in templates when absent (→ "— none —").
+{% endcomment %}
+<td class="px-4 py-2">
+  <div class="flex flex-wrap items-center gap-2">
+    <form hx-post="{% url 'scouting:set_target' player.pk %}"
+          hx-target="#player-row-{{ player.pk }}"
+          hx-swap="outerHTML"
+          hx-trigger="change"
+          class="flex items-center gap-1.5">
+      {% csrf_token %}
+      <select name="stance"
+              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
+                     text-slate-200 focus:border-sky-500 focus:outline-none">
+        <option value="">— none —</option>
+        {% for value, label in stances %}
+          <option value="{{ value }}"
+                  {% if player.target.stance == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="tier"
+              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
+                     text-slate-200 focus:border-sky-500 focus:outline-none">
+        <option value="">tier</option>
+        {% for n in tiers %}
+          <option value="{{ n }}" {% if player.target.tier == n %}selected{% endif %}>T{{ n }}</option>
+        {% endfor %}
+      </select>
+      <select name="priority"
+              class="rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs
+                     text-slate-200 focus:border-sky-500 focus:outline-none">
+        {% for value, label in priorities %}
+          <option value="{{ value }}"
+                  {% if player.target.priority == value %}selected{% elif not player.target and value == 'medium' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <form hx-post="{% url 'scouting:add_note' player.pk %}"
+          hx-target="#player-row-{{ player.pk }}"
+          hx-swap="outerHTML"
+          class="flex items-center gap-1">
+      {% csrf_token %}
+      <input type="text" name="body" placeholder="note…"
+             class="w-24 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs
+                    text-slate-200 placeholder:text-slate-600
+                    focus:border-sky-500 focus:outline-none">
+      {% if player.note_count %}
+        <span class="text-xs text-slate-500" title="scouting notes">📝 {{ player.note_count }}</span>
+      {% endif %}
+    </form>
+  </div>
+</td>

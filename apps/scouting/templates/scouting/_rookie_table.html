@@ -1,0 +1,64 @@
+{% comment %}
+Swappable rookie table. Returned bare by the HTMX endpoint, and included by
+rookie_board.html on first render.
+{% endcomment %}
+<div class="flex items-center justify-between px-1 pb-2 text-xs text-slate-500">
+  <span>
+    {{ page_obj.paginator.count }} rookie{{ page_obj.paginator.count|pluralize }}
+    {% if pos %}at {{ pos }}{% endif %}
+    {% if q %}· matching “{{ q }}”{% endif %}
+  </span>
+  {% if page_obj.paginator.num_pages > 1 %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% endif %}
+</div>
+
+<div class="overflow-x-auto rounded-lg border border-slate-800">
+  <table class="w-full text-left text-sm">
+    <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500">
+      <tr>
+        {% for key, header in columns %}
+          <th class="px-4 py-2 font-medium{% if header == 'Age' or header == 'Exp' or header == 'Rookie' %} text-right{% endif %}">
+            {% if key %}
+              <button
+                hx-get="{% url 'scouting:rookie_board_table' %}?sort={{ key }}&dir={% if sort == key and dir == 'asc' %}desc{% else %}asc{% endif %}{% if querystring %}&{{ querystring }}{% endif %}"
+                hx-target="#board"
+                hx-swap="innerHTML"
+                class="hover:text-slate-300">
+                {{ header }}{% if sort == key %}<span class="ml-0.5">{% if dir == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+              </button>
+            {% else %}{{ header }}{% endif %}
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800">
+      {% for player in players %}
+        {% include "scouting/_rookie_row.html" %}
+      {% empty %}
+        <tr><td colspan="{{ columns|length }}" class="px-4 py-8 text-center text-sm text-slate-500">
+          No rookies match those filters.
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+  <div class="mt-4 flex items-center justify-center gap-2">
+    {% if page_obj.has_previous %}
+      <button hx-get="{% url 'scouting:rookie_board_table' %}?sort={{ sort }}&dir={{ dir }}&page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}"
+              hx-target="#board" hx-swap="innerHTML"
+              class="rounded border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:border-slate-600">
+        ← Previous
+      </button>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <button hx-get="{% url 'scouting:rookie_board_table' %}?sort={{ sort }}&dir={{ dir }}&page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}"
+              hx-target="#board" hx-swap="innerHTML"
+              class="rounded border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:border-slate-600">
+        Next →
+      </button>
+    {% endif %}
+  </div>
+{% endif %}
