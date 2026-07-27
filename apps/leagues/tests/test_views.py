@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from apps.leagues.models import League, LeagueSeason, Manager, RosterSlot, Team
 from apps.leagues.views import DEFAULT_SORT, SORT_FIELDS
-from apps.players.models import Player
+from apps.players.models import Player, PlayerValue
 from apps.sleeper.models import SyncRun
 
 # Mirrors a real superflex dynasty league: six starting slots plus reserves.
@@ -328,6 +328,19 @@ class StartingLineupTests(LeagueFixture):
         flex = [row.position for row in lineup if row.is_flex]
         self.assertEqual(flex, ["FLEX", "SUPER_FLEX"])
 
+    def test_starters_show_value(self) -> None:
+        PlayerValue.objects.create(
+            player=self.starting_qb,
+            season=2026,
+            position="QB",
+            value=91.0,
+            tier=1,
+        )
+        response = self.client.get(self.url())
+        # The tier badge only renders inside the value cell, so its presence
+        # proves the starting-lineup value overlay reached the row.
+        self.assertContains(response, "T1")
+
     def test_lineup_is_unaffected_by_sort_params(self) -> None:
         """Sorting applies to reserves; the lineup order is semantic."""
         lineup = self.client.get(self.url(sort="age", dir="desc")).context["lineup"]
@@ -451,8 +464,24 @@ class ReservesTests(LeagueFixture):
         )
 
     def test_query_count_is_bounded(self) -> None:
-        with self.assertNumQueries(4):
+        # +2 vs the pre-value page: the starting-lineup and reserve overlays each
+        # resolve the latest valued season once; the per-row values are
+        # correlated subqueries, not an N+1.
+        with self.assertNumQueries(6):
             self.client.get(self.url())
+
+    def test_reserves_show_value(self) -> None:
+        PlayerValue.objects.create(
+            player=self.bench_te,
+            season=2026,
+            position="TE",
+            value=63.0,
+            tier=4,
+        )
+        response = self.client.get(self.url())
+        # The tier badge only renders inside the value cell, so its presence
+        # proves the reserve value overlay reached the row.
+        self.assertContains(response, "T4")
 
 
 class ReserveFragmentTests(LeagueFixture):

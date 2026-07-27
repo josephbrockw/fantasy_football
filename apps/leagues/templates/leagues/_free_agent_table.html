@@ -19,7 +19,7 @@ by free_agents.html on first render.
     <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500">
       <tr>
         {% for key, header in columns %}
-          <th class="px-4 py-2 font-medium{% if key == 'age' or key == 'experience' or key == 'rookie_year' or key == 'trending' %} text-right{% endif %}">
+          <th class="px-4 py-2 font-medium{% if key == 'age' or key == 'experience' or key == 'rookie_year' or key == 'trending' or key == 'value' %} text-right{% endif %}">
             {% if key %}
               <button
                 hx-get="{% url 'leagues:free_agents_table' league.slug %}?sort={{ key }}&dir={% if sort == key and dir == 'desc' %}asc{% else %}desc{% endif %}{% if querystring %}&{{ querystring }}{% endif %}"

@@ -58,6 +58,7 @@
           <th class="px-4 py-2 text-right font-medium">Exp</th>
           <th class="px-4 py-2 text-right font-medium">Rookie</th>
           <th class="px-4 py-2 font-medium">Status</th>
+          <th class="px-4 py-2 text-right font-medium">Value</th>
           <th class="px-4 py-2 font-medium">Target</th>
         </tr>
       </thead>
@@ -72,7 +73,7 @@
               </span>
             </td>
             {% if row.slot %}
-              {% include "leagues/_player_row.html" with player=row.slot.player %}
+              {% include "leagues/_player_row.html" with player=row.slot.player value_src=row.slot %}
               <td class="px-4 py-2">
                 {# Lazy-load the target control so the lineup query stays lean. #}
                 <div hx-get="{% url 'scouting:target_widget' team.league_season.league.slug row.slot.player.pk %}"
@@ -81,13 +82,13 @@
                 </div>
               </td>
             {% else %}
-              <td class="px-4 py-2 text-sm italic text-amber-400/80" colspan="8">
+              <td class="px-4 py-2 text-sm italic text-amber-400/80" colspan="9">
                 empty
               </td>
             {% endif %}
           </tr>
         {% empty %}
-          <tr><td colspan="9" class="px-4 py-6 text-center text-sm text-slate-500">
+          <tr><td colspan="10" class="px-4 py-6 text-center text-sm text-slate-500">
             No starting lineup recorded for this season.
           </td></tr>
         {% endfor %}

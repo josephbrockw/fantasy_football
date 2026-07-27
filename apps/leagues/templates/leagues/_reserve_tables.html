@@ -25,13 +25,14 @@ endpoint, and included by team_detail.html on first render.
                 {% else %}{{ header }}{% endif %}
               </th>
             {% endfor %}
+            <th class="px-4 py-2 text-right font-medium">Value</th>
             <th class="px-4 py-2 font-medium">Target</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-800">
           {% for slot in slots %}
             <tr class="hover:bg-slate-900/40">
-              {% include "leagues/_player_row.html" with player=slot.player %}
+              {% include "leagues/_player_row.html" with player=slot.player value_src=slot %}
               <td class="px-4 py-2">
                 {# Lazy-load the target control so the roster query stays lean. #}
                 <div hx-get="{% url 'scouting:target_widget' team.league_season.league.slug slot.player.pk %}"

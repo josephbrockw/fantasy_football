@@ -36,3 +36,22 @@ assumptions — the free agent board reuses it.
     </span>
   {% endif %}
 </td>
+{% comment %}
+Dynasty value + tier. Reads the dynasty_* annotations off `src` — the caller's
+`value_src` when it iterates a RosterSlot and annotates that (reserves), else the
+`player` itself when the caller annotates the Player queryset (free agents,
+rookies, targets). `player` is always present, so it is safe as the default
+filter argument; a missing annotation on `src` resolves to "" and renders "—".
+The now/prospect/horizon breakdown rides in the cell `title` when available.
+{% endcomment %}
+{% with src=value_src|default:player %}
+<td class="px-4 py-2 text-right tabular-nums"
+    {% if src.dynasty_now != '' and src.dynasty_now is not None %}title="Now {{ src.dynasty_now|floatformat:0 }} · Prospect {{ src.dynasty_prospect|floatformat:0 }} · Horizon {{ src.dynasty_horizon|floatformat:0 }}{% if src.dynasty_expires %} · holds form through {{ src.dynasty_expires }}{% endif %}"{% endif %}>
+  {% if src.dynasty_value != '' and src.dynasty_value is not None %}
+    <span class="font-medium text-slate-200">{{ src.dynasty_value|floatformat:0 }}</span>
+    {% if src.dynasty_tier %}<span class="ml-1 rounded bg-indigo-500/15 px-1.5 py-0.5 text-xs font-medium text-indigo-400">T{{ src.dynasty_tier }}</span>{% endif %}
+  {% else %}
+    <span class="text-slate-600">—</span>
+  {% endif %}
+</td>
+{% endwith %}

@@ -21,13 +21,14 @@ the HTMX endpoint, and included by rookie_board.html on first render.
         <th class="px-4 py-2 text-right font-medium">Exp</th>
         <th class="px-4 py-2 text-right font-medium">Rookie</th>
         <th class="px-4 py-2 font-medium">Status</th>
+        <th class="px-4 py-2 text-right font-medium">Value</th>
         <th class="px-4 py-2 font-medium">Target</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-800">
       {% for group in groups %}
         <tr class="bg-slate-900/40">
-          <td colspan="8"
+          <td colspan="9"
               class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
             {{ group.key|default:"—" }}
             <span class="ml-1 font-normal text-slate-600">({{ group.players|length }})</span>
@@ -40,7 +41,7 @@ the HTMX endpoint, and included by rookie_board.html on first render.
           </tr>
         {% endfor %}
       {% empty %}
-        <tr><td colspan="8" class="px-4 py-8 text-center text-sm text-slate-500">
+        <tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-500">
           No rookies match those filters.
         </td></tr>
       {% endfor %}

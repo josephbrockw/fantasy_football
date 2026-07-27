@@ -25,6 +25,7 @@ class SyncRun(TimeStampedModel):
         STATS = "stats", "Stats"
         PROFILES = "profiles", "Profiles"
         METRICS = "metrics", "Metrics"
+        VALUATION = "valuation", "Valuation"
 
     class Status(models.TextChoices):
         RUNNING = "running", "Running"

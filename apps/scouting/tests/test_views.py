@@ -4,13 +4,35 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.leagues.models import League, LeagueSeason, Manager, RosterSlot, Team
-from apps.players.models import Player
+from apps.players.models import Player, PlayerValue
 from apps.scouting.models import ScoutingNote, Target
 from apps.scouting.tests.test_models import make_player
 
 
 def flatten(groups: list[dict]) -> list[Player]:
     return [player for group in groups for player in group["players"]]
+
+
+def make_value(
+    player: Player,
+    *,
+    now: float = 0.0,
+    prospect: float = 0.0,
+    horizon: float = 0.0,
+    value: float | None = None,
+    tier: int | None = None,
+    season: int = 2026,
+) -> PlayerValue:
+    return PlayerValue.objects.create(
+        player=player,
+        season=season,
+        position=player.position,
+        now_score=now,
+        prospect_score=prospect,
+        horizon_score=horizon,
+        value=value if value is not None else now,
+        tier=tier,
+    )
 
 
 class ScoutingFixture(TestCase):
@@ -85,14 +107,24 @@ class RookieBoardTests(ScoutingFixture):
         response = self.client.get(self.url(), {"q": "caleb"})
         self.assertEqual(flatten(response.context["groups"]), [self.qb])
 
-    def test_notable_players_ordered_before_alphabetical(self) -> None:
-        # search_rank is Sleeper's coarse search order (lower = more notable),
-        # used only as a tiebreak — it surfaces notable rookies above alpha.
-        top = make_player("100", "Zack Notable", position="TE", search_rank=5)
-        low = make_player("101", "Aaron Obscure", position="TE", search_rank=999)
+    def test_rookie_board_orders_by_value(self) -> None:
+        # Dynasty value is the ordering signal within a position now, replacing
+        # the coarse search_rank proxy: the higher-value rookie surfaces first,
+        # even though it sorts later alphabetically.
+        top = make_player("100", "Zack Notable", position="TE")
+        low = make_player("101", "Aaron Obscure", position="TE")
+        make_value(top, now=80, prospect=80, horizon=80)
+        make_value(low, now=20, prospect=20, horizon=20)
         response = self.client.get(self.url())
         te = next(g for g in response.context["groups"] if g["key"] == "TE")
         self.assertEqual(te["players"], [top, low])
+
+    def test_rookie_rows_show_value(self) -> None:
+        make_value(self.qb, now=70, prospect=90, horizon=85, tier=1)
+        html = self.client.get(self.url()).content.decode()
+        self.assertIn("T1", html)  # tier badge
+        self.assertIn("Prospect 90", html)  # sub-score breakdown in the title
+        self.assertIn("—", html)  # an unscored rookie still renders a dash
 
     def test_unknown_league_is_404(self) -> None:
         response = self.client.get(reverse("scouting:rookie_board", args=["nope"]))
@@ -107,7 +139,9 @@ class RookieBoardTests(ScoutingFixture):
         self.assertNotIn("base.html", names)
 
     def test_query_budget(self) -> None:
-        with self.assertNumQueries(2):
+        # +1 vs the pre-value board: the value overlay resolves the latest valued
+        # season once; the per-row values themselves are correlated subqueries.
+        with self.assertNumQueries(3):
             self.client.get(
                 reverse("scouting:rookie_board_table", args=[self.league.slug])
             )
@@ -258,3 +292,10 @@ class TargetBoardTests(ScoutingFixture):
         names = [t.name for t in response.templates]
         self.assertIn("scouting/_targets_table.html", names)
         self.assertNotIn("base.html", names)
+
+    def test_target_rows_show_value(self) -> None:
+        make_value(self.rival_star, now=88, prospect=40, horizon=60, tier=2)
+        html = self.client.get(self.url()).content.decode()
+        self.assertIn("T2", html)  # tier badge on the valued target
+        self.assertIn("Now 88", html)  # sub-score breakdown in the title
+        self.assertIn("—", html)  # an unscored target still renders a dash

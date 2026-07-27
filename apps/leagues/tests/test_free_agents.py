@@ -5,7 +5,8 @@ from django.urls import reverse
 
 from apps.leagues.models import League, LeagueSeason, Manager, RosterSlot, Team
 from apps.leagues.views import FREE_AGENT_DEFAULT_SORT, FREE_AGENT_SORTS
-from apps.players.models import Player, TrendingPlayer
+from apps.players.models import Player, PlayerValue, TrendingPlayer
+from apps.players.valuation import DEFAULT_PROFILE
 
 # Starts a kicker nowhere — so kickers must not appear on the board.
 ROSTER_POSITIONS = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "DEF", "BN", "BN"]
@@ -15,6 +16,28 @@ def make_player(sleeper_id: str, name: str, **fields) -> Player:
     defaults = {"position": "WR", "team": "CIN", "age": 25, "years_exp": 3}
     defaults.update(fields)
     return Player.objects.create(sleeper_id=sleeper_id, full_name=name, **defaults)
+
+
+def make_value(
+    player: Player,
+    *,
+    now: float = 0.0,
+    prospect: float = 0.0,
+    horizon: float = 0.0,
+    value: float | None = None,
+    tier: int | None = None,
+    season: int = 2026,
+) -> PlayerValue:
+    return PlayerValue.objects.create(
+        player=player,
+        season=season,
+        position=player.position,
+        now_score=now,
+        prospect_score=prospect,
+        horizon_score=horizon,
+        value=value if value is not None else now,
+        tier=tier,
+    )
 
 
 class FreeAgentFixture(TestCase):
@@ -77,6 +100,15 @@ class FreeAgentFixture(TestCase):
             player=cls.young_rb, kind=TrendingPlayer.Kind.ADD, count=100
         )
 
+        # Dynasty values drive the default order and the profile re-blend. hot is
+        # the top overall; old_wr is a win-now vet (high now, low prospect) and
+        # young_rb a prospect (the reverse), so a contend↔rebuild switch flips
+        # them. past_only is intentionally left unscored → renders "—".
+        make_value(cls.hot, now=90, prospect=80, horizon=80, tier=1)
+        make_value(cls.young_rb, now=50, prospect=90, horizon=90, tier=2)
+        make_value(cls.old_wr, now=85, prospect=20, horizon=30, tier=3)
+        make_value(cls.cold, now=30, prospect=30, horizon=40, tier=5)
+
 
 class FreeAgentQuerysetTests(FreeAgentFixture):
     def url(self, **params) -> str:
@@ -130,15 +162,54 @@ class FreeAgentOrderingTests(FreeAgentFixture):
     def players(self, **params) -> list[Player]:
         return list(self.client.get(self.url(**params)).context["players"])
 
-    def test_defaults_to_trending_adds_descending(self) -> None:
+    def test_default_sort_orders_by_dynasty_value(self) -> None:
+        # Default profile is "contend" (.70 now), so the win-now vet old_wr edges
+        # the prospect young_rb into second behind the top-overall hot.
         found = self.players()
         self.assertEqual(found[0], self.hot)
-        self.assertEqual(found[1], self.young_rb)
+        self.assertEqual(found[1], self.old_wr)
+
+    def test_value_sort_ascending_flips_and_nulls_last(self) -> None:
+        found = self.players(sort="value", dir="asc")
+        self.assertEqual(found[0], self.cold)  # lowest value first
+        self.assertEqual(found[-1], self.past_only)  # unscored sorts last
 
     def test_players_without_trending_data_sort_last_not_missing(self) -> None:
-        found = self.players()
+        found = self.players(sort="trending")
         self.assertIn(self.cold, found)
         self.assertGreater(found.index(self.cold), found.index(self.hot))
+
+    def test_dynasty_value_breaks_ties_not_search_rank(self) -> None:
+        # old_wr and cold both have no trending adds (a tie on the primary sort);
+        # the higher dynasty value now decides the order, replacing search_rank.
+        found = self.players(sort="trending")
+        self.assertLess(found.index(self.old_wr), found.index(self.cold))
+
+    def test_value_column_renders_with_breakdown(self) -> None:
+        html = self.client.get(self.url()).content.decode()
+        self.assertIn("T1", html)  # hot's tier badge
+        self.assertIn("Now 90", html)  # hot's sub-score breakdown in the title
+        self.assertIn("—", html)  # past_only is unscored → dash
+
+    def test_profile_reblends_ordering_without_recompute(self) -> None:
+        # Same stored sub-scores, re-weighted at read time: a win-now vet leads
+        # under "contend", the prospect leads under "rebuild".
+        contend = self.players(profile="contend")
+        self.assertLess(contend.index(self.old_wr), contend.index(self.young_rb))
+        rebuild = self.players(profile="rebuild")
+        self.assertLess(rebuild.index(self.young_rb), rebuild.index(self.old_wr))
+
+    def test_unknown_profile_falls_back_to_default(self) -> None:
+        response = self.client.get(self.url(profile="nonsense"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["profile"], DEFAULT_PROFILE)
+
+    def test_query_budget_is_bounded_by_the_overlay(self) -> None:
+        # The value overlay resolves the latest valued season once; per-row
+        # values are correlated subqueries, not an N+1.
+        url = reverse("leagues:free_agents_table", args=[self.league.slug])
+        with self.assertNumQueries(5):
+            self.client.get(url)
 
     def test_sort_by_age_ascending(self) -> None:
         found = self.players(sort="age", dir="asc")

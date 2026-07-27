@@ -214,7 +214,7 @@ Statuses: `Planned` → `In Progress` → `Complete`.
 
 | # | PR | Status | Notes |
 |----|----|--------|-------|
-| 01 | [PlayerValue model & migration](01_playervalue-model.md) | Planned | Three sub-scores + blended value |
+| 01 | [PlayerValue model & migration](01_playervalue-model.md) | In Progress | Three sub-scores + blended value |
 | 02 | [Baseline valuation compute, command & make target](02_baseline-valuation-compute.md) | Planned | Needs **011 PR 02** and **005** merged |
 | 03 | [Surface value across boards & value sorting](03_surface-value-and-sort.md) | Planned | Read-time profile re-blend |
 

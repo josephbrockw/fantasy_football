@@ -16,6 +16,7 @@ from apps.leagues.models import League, RosterSlot
 # coupling is safe.)
 from apps.leagues.views import PLAYER_POSITION_RANK
 from apps.players.models import Player
+from apps.players.valuation import with_value_overlay
 from apps.scouting.models import ScoutingNote, Target
 
 # Positions that matter for a rookie draft board.
@@ -61,16 +62,15 @@ def rookie_players(
         players = players.filter(position=position)
     if search:
         players = players.filter(full_name__icontains=search)
-    players = _with_target_overlay(players, league).annotate(
+    players = with_value_overlay(_with_target_overlay(players, league)).annotate(
         position_rank=PLAYER_POSITION_RANK
     )
-    # Within a position: my hand-set tier wins, then Sleeper's coarse search
-    # ordering as a "notable first" proxy (search_rank is NOT an ADP — only ever
-    # a tiebreak, never displayed), then name. A real valuation is the ML feature.
+    # Within a position: my hand-set tier wins, then the dynasty value (now the
+    # real ordering signal, replacing the coarse search_rank proxy), then name.
     return players.order_by(
         "position_rank",
         F("target_tier").asc(nulls_last=True),
-        F("search_rank").asc(nulls_last=True),
+        F("dynasty_value").desc(nulls_last=True),
         "full_name",
     )
 
@@ -85,6 +85,7 @@ def targeted_players(league: League, *, stance: str = "") -> QuerySet[Player]:
     players = _with_target_overlay(Player.objects.all(), league).filter(
         targets__league=league
     )
+    players = with_value_overlay(players)
     if stance:
         players = players.filter(targets__stance=stance)
 

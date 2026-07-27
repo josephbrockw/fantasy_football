@@ -211,3 +211,65 @@ class PlayerSeasonMetrics(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.player} {self.season} metrics"
+
+
+class PlayerValue(TimeStampedModel):
+    """A three-axis dynasty valuation for one player, season, and model.
+
+    Written by ``manage.py recompute_values`` (feature 006 PR 02). ``now_score``
+    is this-season lineup value, ``prospect_score`` is breakout likelihood, and
+    ``horizon_score`` / ``horizon_seasons`` / ``expires_season`` are the
+    expiration axis (how long current form holds). ``value`` is the stored blend
+    of the three under the default ``balanced`` weight profile; other profiles
+    re-blend the sub-score columns at query time. ``components`` keeps every
+    intermediate so the numbers are inspectable and a trained model can store
+    feature attributions in the same field. ``model_version`` is on the natural
+    key so ``baseline-v1`` and a future ``trained-v1`` coexist for comparison —
+    the app reads whichever ``ACTIVE_MODEL_VERSION`` names.
+    """
+
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="values")
+    season = models.PositiveSmallIntegerField()
+    model_version = models.CharField(max_length=32, default="baseline-v1")
+
+    # Snapshot of the player's position at compute time, so positional rank /
+    # tier / scarcity are stable and the overlay never re-joins Player.
+    position = models.CharField(max_length=8, blank=True)
+
+    # The three axes, each normalized 0–100 across the scored pool. Columns (not
+    # JSON keys) so weight profiles can re-blend them in querysets.
+    now_score = models.FloatField(default=0.0)
+    prospect_score = models.FloatField(default=0.0)
+    horizon_score = models.FloatField(default=0.0)
+
+    # Expiration: expected seasons of remaining form (position age curve), and
+    # the human-readable "holds form through" season.
+    horizon_seasons = models.FloatField(default=0.0)
+    expires_season = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # Blended dynasty value, 0–100, under WEIGHT_PROFILES["balanced"]. The
+    # pre-normalization raw numbers and all factors live in ``components``.
+    value = models.FloatField()
+    tier = models.PositiveSmallIntegerField(null=True, blank=True)
+    position_rank = models.PositiveSmallIntegerField(null=True, blank=True)
+    overall_rank = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # Every intermediate (production, recent-form blend, age multiplier, scarcity
+    # weight, market nudge, raw, normalized) — so a value is debuggable and a
+    # trained model can drop attributions here.
+    components = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        unique_together = ("player", "season", "model_version")
+        ordering = ["-season", "model_version", "-value"]
+        indexes = [
+            # The overlay in PR 03: active model, one season, by value desc.
+            models.Index(fields=["season", "model_version", "-value"]),
+            # Positional ranking / tiering within a season.
+            models.Index(fields=["season", "model_version", "position", "-value"]),
+            # Per-player lookup across seasons (value history / admin).
+            models.Index(fields=["player", "model_version"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player} {self.season} {self.model_version} v={self.value:.1f}"

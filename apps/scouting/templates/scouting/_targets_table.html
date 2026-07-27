@@ -18,6 +18,7 @@ team's next move.
         <th class="px-4 py-2 text-right font-medium">Exp</th>
         <th class="px-4 py-2 text-right font-medium">Rookie</th>
         <th class="px-4 py-2 font-medium">Status</th>
+        <th class="px-4 py-2 text-right font-medium">Value</th>
         <th class="px-4 py-2 font-medium">Rostered by</th>
         <th class="px-4 py-2 font-medium">Target</th>
       </tr>
@@ -25,7 +26,7 @@ team's next move.
     <tbody class="divide-y divide-slate-800">
       {% for group in groups %}
         <tr class="{% if group.key == 'acquire' %}bg-emerald-500/5{% else %}bg-red-500/5{% endif %}">
-          <td colspan="9" class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider
+          <td colspan="10" class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider
                      {% if group.key == 'acquire' %}text-emerald-400{% else %}text-red-400{% endif %}">
             {{ group.key }}
             <span class="ml-1 font-normal text-slate-600">({{ group.players|length }})</span>
@@ -49,7 +50,7 @@ team's next move.
           </tr>
         {% endfor %}
       {% empty %}
-        <tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-500">
+        <tr><td colspan="10" class="px-4 py-8 text-center text-sm text-slate-500">
           No targets yet — mark players Acquire or Avoid from the rookie board, a
           roster, or the free-agent board.
         </td></tr>

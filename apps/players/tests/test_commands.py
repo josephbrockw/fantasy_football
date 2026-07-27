@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.players.models import (
     Player,
     PlayerSeasonMetrics,
+    PlayerValue,
     PlayerWeekStat,
     TrendingPlayer,
 )
@@ -314,3 +315,29 @@ class MetricsReportCommandTests(TestCase):
 
     def test_empty_warns_cleanly(self) -> None:
         self.assertIn("No PlayerSeasonMetrics rows found", self.call())
+
+
+class RecomputeValuesCommandTests(TestCase):
+    def seed(self, season: int = 2024) -> None:
+        player = Player.objects.create(sleeper_id="p", full_name="X", position="WR")
+        PlayerSeasonMetrics.objects.create(
+            player=player, season=season, position="WR", games_played=15, ppg_ppr=15.0
+        )
+
+    def test_writes_and_reports(self) -> None:
+        self.seed()
+        out = StringIO()
+        call_command("recompute_values", "--season", "2024", stdout=out)
+        self.assertIn("value(s) for season 2024", out.getvalue())
+        self.assertTrue(PlayerValue.objects.exists())
+
+    def test_no_metrics_errors(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("recompute_values", stdout=StringIO())
+
+    def test_unknown_version_errors(self) -> None:
+        self.seed()
+        with self.assertRaises(CommandError):
+            call_command(
+                "recompute_values", "--model-version", "nope", stdout=StringIO()
+            )

@@ -29,7 +29,14 @@ from apps.leagues.models import (
     TradedPick,
 )
 from apps.leagues.services import starting_slots
-from apps.players.models import Player, TrendingPlayer
+from apps.players.models import Player, PlayerValue, TrendingPlayer
+from apps.players.valuation import (
+    ACTIVE_MODEL_VERSION,
+    DEFAULT_PROFILE,
+    WEIGHT_PROFILES,
+    latest_valued_season,
+    with_value_overlay,
+)
 from apps.sleeper.models import SyncRun
 
 # Whitelisted sort keys → ORM paths. User input is never interpolated into
@@ -90,6 +97,24 @@ class LineupRow:
         return "FLEX" in self.position
 
 
+def slot_value_annotations() -> dict[str, Subquery]:
+    """dynasty_value / dynasty_tier subqueries for a ``RosterSlot`` queryset.
+
+    Keyed on the slot's ``player_id`` (not ``pk``) since the reserve and lineup
+    tables iterate slots, not players; the row template reads these off the
+    passed ``value_src`` rather than off ``slot.player``.
+    """
+    valued_season = latest_valued_season()
+    pv = PlayerValue.objects.filter(
+        player=OuterRef("player_id"), model_version=ACTIVE_MODEL_VERSION
+    )
+    pv = pv.filter(season=valued_season) if valued_season is not None else pv.none()
+    return {
+        "dynasty_value": Subquery(pv.values("value")[:1]),
+        "dynasty_tier": Subquery(pv.values("tier")[:1]),
+    }
+
+
 def reserve_slots(
     team: Team, sort: str, direction: str, position: str
 ) -> QuerySet[RosterSlot]:
@@ -97,7 +122,7 @@ def reserve_slots(
     slots = (
         RosterSlot.objects.filter(team=team, slot__in=RESERVE_SLOTS)
         .select_related("player")
-        .annotate(position_rank=POSITION_RANK)
+        .annotate(position_rank=POSITION_RANK, **slot_value_annotations())
     )
     if position:
         slots = slots.filter(player__position=position)
@@ -135,9 +160,9 @@ def starting_lineup(team: Team) -> list[LineupRow]:
     silently vanishing.
     """
     starters = list(
-        RosterSlot.objects.filter(
-            team=team, slot=RosterSlot.Slot.STARTER
-        ).select_related("player")
+        RosterSlot.objects.filter(team=team, slot=RosterSlot.Slot.STARTER)
+        .select_related("player")
+        .annotate(**slot_value_annotations())
     )
     by_index = {s.lineup_order: s for s in starters if s.lineup_order is not None}
 
@@ -396,6 +421,7 @@ class TeamReserveTableView(RosterFilterMixin, TemplateView):
 
 
 FREE_AGENT_SORTS: dict[str, str] = {
+    "value": "dynasty_value",
     "trending": "trend_add",
     "position": "position_rank",
     "name": "full_name",
@@ -404,7 +430,7 @@ FREE_AGENT_SORTS: dict[str, str] = {
     "experience": "years_exp",
     "rookie_year": "rookie_year",
 }
-FREE_AGENT_DEFAULT_SORT = "trending"
+FREE_AGENT_DEFAULT_SORT = "value"
 
 FREE_AGENT_COLUMNS: list[tuple[str, str]] = [
     ("name", "Player"),
@@ -414,6 +440,7 @@ FREE_AGENT_COLUMNS: list[tuple[str, str]] = [
     ("experience", "Exp"),
     ("rookie_year", "Rookie"),
     ("", "Status"),
+    ("value", "Value"),
     ("trending", "Adds 24h"),
 ]
 
@@ -436,6 +463,7 @@ def free_agents(
     max_age: int | None = None,
     search: str = "",
     include_inactive: bool = False,
+    profile: str = DEFAULT_PROFILE,
 ) -> QuerySet[Player]:
     """Players not rostered anywhere in this season of this league.
 
@@ -479,6 +507,9 @@ def free_agents(
             Value(0),
         ),
     )
+    # Dynasty value overlay, re-blended under the requested weight profile so a
+    # contend/rebuild switch re-orders the board without a recompute.
+    players = with_value_overlay(players, profile=profile)
 
     field = F(FREE_AGENT_SORTS.get(sort, FREE_AGENT_SORTS[FREE_AGENT_DEFAULT_SORT]))
     ordering = (
@@ -486,10 +517,10 @@ def free_agents(
         if direction == "desc"
         else field.asc(nulls_last=True)
     )
-    # search_rank is only ever a tiebreak: it collides heavily and is not an
-    # ADP. Never surface it as a rank or sort by it alone.
+    # Dynasty value is the tiebreak now — the whole point of this feature. It
+    # replaces search_rank, which collided heavily and was never an ADP.
     return players.order_by(
-        ordering, F("search_rank").asc(nulls_last=True), "full_name"
+        ordering, F("dynasty_value").desc(nulls_last=True), "full_name"
     )
 
 
@@ -512,6 +543,9 @@ class FreeAgentListView(ListView):
             max_age = int(raw_age) if raw_age else None
         except ValueError:
             max_age = None
+        profile = self.request.GET.get("profile", DEFAULT_PROFILE)
+        if profile not in WEIGHT_PROFILES:
+            profile = DEFAULT_PROFILE
         return {
             "sort": sort,
             "dir": "asc" if self.request.GET.get("dir") == "asc" else "desc",
@@ -519,6 +553,7 @@ class FreeAgentListView(ListView):
             "max_age": max_age,
             "q": self.request.GET.get("q", "").strip(),
             "include_inactive": self.request.GET.get("inactive") == "1",
+            "profile": profile,
         }
 
     def get_queryset(self) -> QuerySet[Player]:
@@ -535,6 +570,7 @@ class FreeAgentListView(ListView):
             max_age=self.params["max_age"],
             search=self.params["q"],
             include_inactive=self.params["include_inactive"],
+            profile=self.params["profile"],
         )
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
@@ -544,6 +580,7 @@ class FreeAgentListView(ListView):
         context["season"] = self.season
         context["positions"] = self.season.fantasy_positions if self.season else []
         context["columns"] = FREE_AGENT_COLUMNS
+        context["profiles"] = list(WEIGHT_PROFILES)
         context["querystring"] = self.querystring()
         return context
 
@@ -558,6 +595,8 @@ class FreeAgentListView(ListView):
             parts.append(f"q={self.params['q']}")
         if self.params["include_inactive"]:
             parts.append("inactive=1")
+        if self.params["profile"] != DEFAULT_PROFILE:
+            parts.append(f"profile={self.params['profile']}")
         return "&".join(parts)
 
 

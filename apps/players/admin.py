@@ -3,6 +3,7 @@ from django.contrib import admin
 from apps.players.models import (
     Player,
     PlayerSeasonMetrics,
+    PlayerValue,
     PlayerWeekStat,
     TrendingPlayer,
 )
@@ -57,3 +58,26 @@ class PlayerSeasonMetricsAdmin(admin.ModelAdmin):
     list_filter = ("season", "position", "season_type")
     search_fields = ("player__full_name",)
     raw_id_fields = ("player",)
+
+
+@admin.register(PlayerValue)
+class PlayerValueAdmin(admin.ModelAdmin):
+    list_display = (
+        "player",
+        "season",
+        "model_version",
+        "position",
+        "value",
+        "now_score",
+        "prospect_score",
+        "horizon_score",
+        "expires_season",
+        "tier",
+        "position_rank",
+        "overall_rank",
+    )
+    list_filter = ("model_version", "season", "position")
+    search_fields = ("player__full_name",)
+    raw_id_fields = ("player",)
+    readonly_fields = ("components", "created_at", "updated_at")
+    ordering = ("-season", "-value")

@@ -56,6 +56,19 @@
                         focus:ring-0 focus:ring-offset-0">
           Include inactive
         </label>
+
+        <label class="flex items-center gap-2 text-xs text-slate-500">
+          Outlook
+          <select name="profile"
+                  class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5
+                         text-sm text-slate-200 focus:border-sky-500 focus:outline-none">
+            {% for name in profiles %}
+              <option value="{{ name }}" {% if profile == name %}selected{% endif %}>
+                {{ name|capfirst }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
